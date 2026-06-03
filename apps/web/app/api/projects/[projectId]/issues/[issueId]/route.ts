@@ -9,8 +9,9 @@ import {
   issueWorkflowStates,
   rfiStatuses,
 } from "@/lib/issues/workflow";
+import { riskMetadataPatchSchema, type RiskMetadataPatch } from "@/lib/risks/validation";
 
-const issueUpdateSchema = z.object({
+const workflowUpdateSchema = z.object({
   workflow_state: z.enum(issueWorkflowStates),
   status: z.enum(issueStatuses).optional(),
   rfi_status: z.enum(rfiStatuses).optional(),
@@ -26,6 +27,11 @@ const issueUpdateSchema = z.object({
   external_url: z.string().max(1000).nullable().optional(),
   response: z.string().max(4000).nullable().optional(),
 });
+
+const issueUpdateSchema = workflowUpdateSchema.extend(riskMetadataPatchSchema.shape);
+
+const hasRiskMetadataPatch = (patch: RiskMetadataPatch) =>
+  Object.values(patch).some((value) => value !== undefined);
 
 export async function PATCH(
   request: Request,
@@ -83,6 +89,23 @@ export async function PATCH(
 
   if (saveError) {
     return NextResponse.json({ error: saveError.message }, { status: 500 });
+  }
+
+  const riskPatch = riskMetadataPatchSchema.parse(parsed.data);
+  if (hasRiskMetadataPatch(riskPatch)) {
+    const { error: riskUpdateError } = await supabase
+      .from("issues")
+      .update({
+        ...riskPatch,
+        human_reviewed_at: new Date().toISOString(),
+        human_reviewed_by: user.id,
+      })
+      .eq("id", issueId)
+      .eq("project_id", projectId);
+
+    if (riskUpdateError) {
+      return NextResponse.json({ error: riskUpdateError.message }, { status: 500 });
+    }
   }
 
   const { data: issue, error } = await supabase
