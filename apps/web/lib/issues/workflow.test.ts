@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   buildDraftRfiExportText,
@@ -9,7 +11,25 @@ import {
   isWorkflowTransitionAllowed,
   normalizeIssueEvidence,
   summarizeIssueWorkflows,
+  issueWorkflowModel,
 } from "./workflow";
+
+function parseSqlTupleList(sql: string, insertTarget: string) {
+  const insertStart = sql.indexOf(`INSERT INTO public.${insertTarget}`);
+  expect(insertStart).toBeGreaterThan(-1);
+
+  const valuesStart = sql.indexOf("VALUES", insertStart);
+  const valuesEnd = sql.indexOf("ON CONFLICT", valuesStart);
+  expect(valuesStart).toBeGreaterThan(-1);
+  expect(valuesEnd).toBeGreaterThan(valuesStart);
+
+  return [...sql.slice(valuesStart, valuesEnd).matchAll(/\(([^)]+)\)/g)].map((match) =>
+    [...match[1].matchAll(/'([^']*)'|(TRUE|FALSE)/g)].map((valueMatch) => {
+      if (valueMatch[2]) return valueMatch[2] === "TRUE";
+      return valueMatch[1];
+    })
+  );
+}
 
 describe("RFI issue workflow", () => {
   test("allows draft RFI lifecycle states from an open issue", () => {
@@ -213,5 +233,43 @@ describe("RFI issue workflow", () => {
     expect(text).toContain("Evidence:\n1. A601 Door Schedule, page 12: Door 101 hardware set is omitted.");
     expect(text).toContain("External RFI Number: RFI-042");
     expect(text).not.toContain("undefined");
+  });
+
+  test("matches the workflow states and transitions enforced by the SQL migration", () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), "../../supabase/migrations/006_rfi_workflow.sql"),
+      "utf8"
+    );
+
+    const sqlStates = Object.fromEntries(
+      parseSqlTupleList(migration, "issue_workflow_states").map(
+        ([workflow_state, issue_status, rfi_status, summary_bucket, creates_rfi]) => [
+          workflow_state,
+          { issue_status, rfi_status, summary_bucket, creates_rfi },
+        ]
+      )
+    );
+    const tsStates = Object.fromEntries(
+      Object.entries(issueWorkflowModel).map(([workflow_state, definition]) => [
+        workflow_state,
+        {
+          issue_status: definition.issue_status,
+          rfi_status: definition.rfi_status,
+          summary_bucket: definition.summary_bucket,
+          creates_rfi: definition.creates_rfi,
+        },
+      ])
+    );
+
+    const sqlTransitions = parseSqlTupleList(migration, "issue_workflow_transitions").map(
+      ([current_state, next_state]) => `${current_state}->${next_state}`
+    );
+    const tsTransitions = Object.entries(issueWorkflowModel).flatMap(
+      ([current_state, definition]) =>
+        definition.transitions.map((next_state) => `${current_state}->${next_state}`)
+    );
+
+    expect(sqlStates).toEqual(tsStates);
+    expect(sqlTransitions).toEqual(tsTransitions);
   });
 });

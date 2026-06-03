@@ -2,22 +2,9 @@
 
 import { useState } from "react";
 import { ExternalLink, FileSearch, X } from "lucide-react";
+import { fetchSourcePage, type SourcePage } from "@/lib/documents/source-page";
 import type { IssueEvidence } from "@/lib/types/database";
 import { Button } from "@/components/ui/button";
-
-type SourcePage = {
-  id: string;
-  page_number: number;
-  sheet_number: string | null;
-  sheet_title: string | null;
-  text_content: string | null;
-  image_url: string | null;
-  document: {
-    id: string;
-    name: string;
-    file_name: string;
-  };
-};
 
 export function SourceViewer({
   projectId,
@@ -40,12 +27,13 @@ export function SourceViewer({
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/projects/${projectId}/documents/${evidence.document_id}/pages/${evidence.page_number}`
+      setPage(
+        await fetchSourcePage({
+          projectId,
+          documentId: evidence.document_id,
+          pageNumber: evidence.page_number,
+        })
       );
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Source page unavailable");
-      setPage(data.page as SourcePage);
     } catch (err) {
       setPage(null);
       setError(err instanceof Error ? err.message : "Source page unavailable");
