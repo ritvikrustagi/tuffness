@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { analyzeTopicGroup, RfiAnalysisError } from "@/lib/agents/rfi/analyze";
 import type { RfiAgentIssue } from "@/lib/agents/rfi/schema";
 import { retrieveTopicChunkGroups } from "@/lib/agents/rfi/topics";
+import { normalizeIssueEvidence } from "@/lib/issues/workflow";
 
 export class RfiScanError extends Error {
   constructor(
@@ -47,12 +48,7 @@ async function persistIssueWithRfi(
     topicLabel: string;
   }
 ): Promise<void> {
-  const evidence = params.issue.evidence.map((item) => ({
-    document_id: item.document_id,
-    document_name: item.document_name,
-    page_number: item.page_number,
-    excerpt: item.quote,
-  }));
+  const evidence = normalizeIssueEvidence(params.issue.evidence);
 
   const { data: issueRow, error: issueError } = await supabase
     .from("issues")
@@ -62,11 +58,16 @@ async function persistIssueWithRfi(
       agent_run_id: params.agentRunId,
       issue_type: params.issue.issue_type,
       severity: params.issue.severity,
-      status: "open",
+      status: "draft_rfi",
       summary: params.issue.summary,
-      description: `Detected during RFI scan (${params.topicLabel}). Pending human review.`,
+      description:
+        params.issue.description ??
+        `Detected during RFI scan (${params.topicLabel}). Pending human review.`,
       evidence,
       draft_rfi: params.issue.draft_rfi,
+      confidence: params.issue.confidence ?? null,
+      trade: params.issue.trade ?? null,
+      recommended_action: params.issue.recommended_action ?? null,
       created_by: params.userId,
     })
     .select("id")

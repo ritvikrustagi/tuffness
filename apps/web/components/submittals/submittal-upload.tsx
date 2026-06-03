@@ -3,7 +3,6 @@
 import { useCallback, useState } from "react";
 import { Upload } from "lucide-react";
 import { SUBMITTAL_CATEGORIES, type SubmittalCategory } from "@/lib/agents/submittal/schema";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 

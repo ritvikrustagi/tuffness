@@ -17,8 +17,12 @@ export const rfiIssueSchema = z.object({
   ]),
   severity: z.enum(["low", "medium", "high"]),
   summary: z.string().min(1).max(500),
+  description: z.string().min(1).max(2000).optional(),
   evidence: z.array(rfiEvidenceSchema).min(1).max(10),
   draft_rfi: z.string().min(1).max(4000),
+  confidence: z.number().min(0).max(1).optional(),
+  trade: z.string().min(1).max(100).optional(),
+  recommended_action: z.string().min(1).max(1000).optional(),
 });
 
 export const rfiAgentOutputSchema = z.object({

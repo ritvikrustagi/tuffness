@@ -11,6 +11,7 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const agentRunId = searchParams.get("agent_run_id");
+  const status = searchParams.get("status");
 
   let query = supabase
     .from("issues")
@@ -20,6 +21,10 @@ export async function GET(
 
   if (agentRunId) {
     query = query.eq("agent_run_id", agentRunId);
+  }
+
+  if (status) {
+    query = query.eq("status", status);
   }
 
   const { data: issues, error } = await query;

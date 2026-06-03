@@ -32,7 +32,7 @@ export default async function ProjectIssuesPage({
         <RfiScanButton projectId={projectId} />
       </div>
 
-      <IssueList issues={(issues ?? []) as Issue[]} />
+      <IssueList projectId={projectId} issues={(issues ?? []) as Issue[]} />
     </div>
   );
 }

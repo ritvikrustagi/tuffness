@@ -53,7 +53,10 @@ Rules:
 5. draft_rfi must be a formal RFI question ready for human review and submission.
 6. issue_type must be one of: drawing_spec_conflict, missing_info, code_conflict, coordination, other.
 7. severity must be low, medium, or high.
-8. Maximum 3 issues per topic.`;
+8. confidence must be a number from 0 to 1 based only on the strength of cited evidence.
+9. recommended_action must be a short next step for the project engineer.
+10. Do not invent trade, impact, cost, schedule, code, sheet, or spec details not visible in the excerpts.
+11. Maximum 3 issues per topic.`;
 
   const userPrompt = `Topic: ${topic.label}
 
@@ -67,6 +70,7 @@ Return JSON:
       "issue_type": "drawing_spec_conflict",
       "severity": "high",
       "summary": "...",
+      "description": "...",
       "evidence": [
         {
           "document_id": "uuid",
@@ -75,7 +79,10 @@ Return JSON:
           "quote": "..."
         }
       ],
-      "draft_rfi": "..."
+      "draft_rfi": "...",
+      "confidence": 0.85,
+      "trade": "doors/hardware",
+      "recommended_action": "Review the cited sheet and spec section, then submit the draft RFI if the conflict is confirmed."
     }
   ]
 }`;

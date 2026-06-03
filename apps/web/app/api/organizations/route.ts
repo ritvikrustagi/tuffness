@@ -23,7 +23,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { user, supabase, errorResponse } = await requireUser();
+  const { supabase, errorResponse } = await requireUser();
   if (errorResponse) return errorResponse;
 
   const body = await request.json();

@@ -71,8 +71,21 @@ export type IssueType =
   | "other";
 
 export type IssueSeverity = "low" | "medium" | "high" | "critical";
-export type IssueStatus = "open" | "acknowledged" | "resolved" | "dismissed";
-export type RfiStatus = "draft" | "submitted" | "answered" | "closed";
+export type IssueStatus =
+  | "open"
+  | "acknowledged"
+  | "draft_rfi"
+  | "submitted"
+  | "answered"
+  | "resolved"
+  | "dismissed";
+export type RfiStatus =
+  | "draft"
+  | "needs_edit"
+  | "approved"
+  | "submitted_externally"
+  | "answered"
+  | "closed";
 export type AgentType = "rfi_scan" | "rfi_agent" | "submittal_review" | "document_process";
 export type AgentRunStatus = "pending" | "running" | "completed" | "failed";
 
@@ -147,6 +160,14 @@ export interface Issue {
   description: string | null;
   evidence: IssueEvidence[];
   draft_rfi: string | null;
+  owner_id: string | null;
+  trade: string | null;
+  discipline: string | null;
+  due_date: string | null;
+  confidence: number | null;
+  recommended_action: string | null;
+  resolution_notes: string | null;
+  external_system_url: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -163,6 +184,11 @@ export interface Rfi {
   question: string;
   status: RfiStatus;
   response: string | null;
+  external_rfi_number: string | null;
+  external_url: string | null;
+  submitted_at: string | null;
+  answered_at: string | null;
+  answer_source_document_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -64,7 +64,6 @@ export function ChatPanel({ projectId }: { projectId: string }) {
 
       const decoder = new TextDecoder();
       let buffer = "";
-      let assistantText = "";
       let citations: Citation[] = [];
 
       while (true) {
@@ -83,10 +82,11 @@ export function ChatPanel({ projectId }: { projectId: string }) {
           try {
             const event = JSON.parse(payload) as ChatStreamEvent;
             if (event.type === "text" && event.content) {
-              assistantText += event.content;
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg.id === assistantId ? { ...msg, content: assistantText } : msg
+                  msg.id === assistantId
+                    ? { ...msg, content: `${msg.content}${event.content}` }
+                    : msg
                 )
               );
             } else if (event.type === "citations" && event.citations) {
@@ -103,7 +103,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
 
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === assistantId ? { ...msg, content: assistantText, citations } : msg
+          msg.id === assistantId ? { ...msg, citations } : msg
         )
       );
     } catch (err) {
