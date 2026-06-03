@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { calculateRiskScore, getRiskTier } from "./scoring";
 import { complianceImpacts, impactLevels, requiredArtifacts, riskCategories } from "./types";
+import type { Issue } from "../types/database";
 
 describe("risk scoring", () => {
   test("uses planned risk vocabulary", () => {
@@ -73,5 +74,46 @@ describe("risk scoring", () => {
     expect(getRiskTier(60)).toBe("high");
     expect(getRiskTier(30)).toBe("medium");
     expect(getRiskTier(10)).toBe("low");
+  });
+
+  test("database Issue type exposes risk register metadata", () => {
+    const issue = {
+      risk_category: "possible_spec_deviation",
+      risk_score: 88,
+      risk_tier: "critical",
+      cost_impact: "medium",
+      schedule_impact: "high",
+      compliance_impact: "code_or_life_safety",
+      responsible_party: "Architect",
+      responsible_trade: "doors/hardware",
+      spec_section: "08 11 13",
+      drawing_sheet: "A601",
+      required_artifact: "rfi",
+      blocked_activity: "Door frame release",
+      risk_reasoning: "The door schedule lacks a fire rating while the spec requires rated openings.",
+      evidence_strength: "strong",
+      human_reviewed_at: null,
+      human_reviewed_by: null,
+    } satisfies Pick<
+      Issue,
+      | "risk_category"
+      | "risk_score"
+      | "risk_tier"
+      | "cost_impact"
+      | "schedule_impact"
+      | "compliance_impact"
+      | "responsible_party"
+      | "responsible_trade"
+      | "spec_section"
+      | "drawing_sheet"
+      | "required_artifact"
+      | "blocked_activity"
+      | "risk_reasoning"
+      | "evidence_strength"
+      | "human_reviewed_at"
+      | "human_reviewed_by"
+    >;
+
+    expect(issue.risk_tier).toBe("critical");
   });
 });

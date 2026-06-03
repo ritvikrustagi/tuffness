@@ -71,6 +71,37 @@ export type IssueType =
   | "other";
 
 export type IssueSeverity = "low" | "medium" | "high" | "critical";
+export type RiskCategory =
+  | "drawing_spec_conflict"
+  | "missing_information"
+  | "coordination_conflict"
+  | "submittal_requirement"
+  | "possible_spec_deviation"
+  | "owner_design_approval"
+  | "schedule_constraint"
+  | "cost_exposure"
+  | "closeout_risk"
+  | "other";
+export type ImpactLevel = "none" | "low" | "medium" | "high" | "critical";
+export type ComplianceImpact =
+  | "none"
+  | "possible_noncompliance"
+  | "spec_deviation"
+  | "code_or_life_safety"
+  | "submittal_required"
+  | "owner_approval_required"
+  | "inspection_or_testing_required"
+  | "closeout_required";
+export type RequiredArtifact =
+  | "none"
+  | "rfi"
+  | "submittal"
+  | "test_report"
+  | "owner_approval"
+  | "inspection"
+  | "closeout_document";
+export type RiskTier = "low" | "medium" | "high" | "critical";
+export type EvidenceStrength = "weak" | "moderate" | "strong";
 export type IssueStatus =
   | "open"
   | "acknowledged"
@@ -86,7 +117,7 @@ export type RfiStatus =
   | "submitted_externally"
   | "answered"
   | "closed";
-export type AgentType = "rfi_scan" | "rfi_agent" | "submittal_review" | "document_process";
+export type AgentType = "rfi_scan" | "rfi_agent" | "risk_agent" | "submittal_review" | "document_process";
 export type AgentRunStatus = "pending" | "running" | "completed" | "failed";
 export type IntegrationProvider =
   | "manual"
@@ -188,6 +219,22 @@ export interface Issue {
   recommended_action: string | null;
   resolution_notes: string | null;
   external_system_url: string | null;
+  risk_category: RiskCategory | null;
+  risk_score: number | null;
+  risk_tier: RiskTier | null;
+  cost_impact: ImpactLevel | null;
+  schedule_impact: ImpactLevel | null;
+  compliance_impact: ComplianceImpact | null;
+  responsible_party: string | null;
+  responsible_trade: string | null;
+  spec_section: string | null;
+  drawing_sheet: string | null;
+  required_artifact: RequiredArtifact | null;
+  blocked_activity: string | null;
+  risk_reasoning: string | null;
+  evidence_strength: EvidenceStrength | null;
+  human_reviewed_at: string | null;
+  human_reviewed_by: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
