@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+apps/*/node_modules/
+.venv/
+venv/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+coverage/
+__pycache__/
+*.py[cod]
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Local tool/cache files
+.DS_Store
+.turbo/
+.vercel/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Broken nested git metadata preserved during root repo setup
+apps/web/.git.invalid-backup/
