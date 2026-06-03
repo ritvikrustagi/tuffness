@@ -119,4 +119,26 @@ describe("risk summaries", () => {
     expect(csv).toContain(`"'=Doors"`);
     expect(csv).toContain(`"'+Architect"`);
   });
+
+  test("buildRiskCsv neutralizes formula-like values after leading whitespace", () => {
+    const csv = buildRiskCsv([
+      {
+        id: "risk-formula",
+        summary: " =cmd",
+        status: "open",
+        risk_tier: "high",
+        risk_category: "other",
+        cost_impact: "none",
+        schedule_impact: "medium",
+        compliance_impact: "none",
+        required_artifact: "none",
+        confidence: 0.8,
+        recommended_action: '\t=HYPERLINK("x","y")',
+        evidence: [],
+      },
+    ]);
+
+    expect(csv).toContain(`"' =cmd"`);
+    expect(csv).toContain(`"'\t=HYPERLINK(""x"",""y"")"`);
+  });
 });

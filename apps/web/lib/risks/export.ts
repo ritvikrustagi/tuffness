@@ -20,7 +20,7 @@ const riskCsvHeaders = [
 
 function quoteCsvCell(value: string | number | null | undefined) {
   const cell = String(value ?? "");
-  const neutralizedCell = /^[=+\-@]/.test(cell) ? `'${cell}` : cell;
+  const neutralizedCell = /^[\t\r\n ]*[=+\-@]/.test(cell) ? `'${cell}` : cell;
 
   return `"${neutralizedCell.replaceAll('"', '""')}"`;
 }
