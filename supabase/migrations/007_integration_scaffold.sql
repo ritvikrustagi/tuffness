@@ -113,7 +113,8 @@ CREATE INDEX IF NOT EXISTS idx_external_record_links_project
 CREATE UNIQUE INDEX IF NOT EXISTS idx_external_record_links_internal
   ON public.external_record_links(provider, internal_table, internal_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_external_record_links_external
-  ON public.external_record_links(provider, internal_table, external_id);
+  ON public.external_record_links(connection_id, internal_table, external_id)
+  WHERE connection_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.integration_sync_runs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

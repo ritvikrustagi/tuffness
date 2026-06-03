@@ -1,3 +1,11 @@
+import type {
+  ExternalConnection,
+  ExternalProjectMapping,
+  ExternalRecordLink,
+  IntegrationOperation,
+  IntegrationProvider,
+} from "@/lib/types/database";
+
 export const integrationProviders = [
   "manual",
   "email",
@@ -6,9 +14,7 @@ export const integrationProviders = [
   "sharepoint_onedrive",
   "bluebeam",
   "csv",
-] as const;
-
-export type IntegrationProvider = (typeof integrationProviders)[number];
+] as const satisfies readonly IntegrationProvider[];
 
 export const connectorOperations = [
   "connect_account",
@@ -19,9 +25,7 @@ export const connectorOperations = [
   "export_rfi",
   "sync_rfi_status",
   "disconnect_account",
-] as const;
-
-export type ConnectorOperation = (typeof connectorOperations)[number];
+] as const satisfies readonly IntegrationOperation[];
 
 export type ConnectorCapabilities = {
   provider: IntegrationProvider;
@@ -32,7 +36,7 @@ export type ConnectorCapabilities = {
   supports_writeback: boolean;
   supports_two_way_sync: boolean;
   writeback_requires_approval: boolean;
-  supported_operations: ConnectorOperation[];
+  supported_operations: IntegrationOperation[];
 };
 
 const connectorCapabilities: Record<IntegrationProvider, ConnectorCapabilities> = {
@@ -121,30 +125,7 @@ const connectorCapabilities: Record<IntegrationProvider, ConnectorCapabilities> 
   },
 };
 
-export type ExternalConnection = {
-  id: string;
-  provider: IntegrationProvider;
-  organization_id: string;
-  status: "connected" | "disconnected" | "error";
-  account_label: string | null;
-  last_sync_at: string | null;
-};
-
-export type ExternalProjectMapping = {
-  id: string;
-  provider: IntegrationProvider;
-  project_id: string;
-  external_project_id: string;
-  external_project_url: string | null;
-};
-
-export type ExternalRecordLink = {
-  provider: IntegrationProvider;
-  internal_table: "documents" | "issues" | "rfis" | "submittals";
-  internal_id: string;
-  external_id: string;
-  external_url: string | null;
-};
+export type { ExternalConnection, ExternalProjectMapping, ExternalRecordLink };
 
 export function getConnectorCapabilities(provider: IntegrationProvider): ConnectorCapabilities {
   return connectorCapabilities[provider];

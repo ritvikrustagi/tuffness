@@ -3,16 +3,17 @@ import {
   buildDraftRfiExportText,
   buildIssueWorkflowPatch,
   deriveWorkflowState,
-  getAllowedIssueTransitions,
+  getAllowedWorkflowTransitions,
+  getWorkflowStatuses,
   getInitialIssueWorkflowDraft,
-  isIssueTransitionAllowed,
+  isWorkflowTransitionAllowed,
   normalizeIssueEvidence,
   summarizeIssueWorkflows,
 } from "./workflow";
 
 describe("RFI issue workflow", () => {
-  test("allows draft RFI lifecycle statuses from an open issue", () => {
-    expect(getAllowedIssueTransitions("open")).toEqual([
+  test("allows draft RFI lifecycle states from an open issue", () => {
+    expect(getAllowedWorkflowTransitions("open")).toEqual([
       "acknowledged",
       "draft_rfi",
       "resolved",
@@ -20,10 +21,21 @@ describe("RFI issue workflow", () => {
     ]);
   });
 
-  test("rejects issue status jumps that skip the workflow", () => {
-    expect(isIssueTransitionAllowed("open", "answered")).toBe(false);
-    expect(isIssueTransitionAllowed("open", "draft_rfi")).toBe(true);
-    expect(isIssueTransitionAllowed("resolved", "open")).toBe(true);
+  test("rejects workflow jumps that skip the state machine", () => {
+    expect(isWorkflowTransitionAllowed("open", "answered")).toBe(false);
+    expect(isWorkflowTransitionAllowed("open", "draft_rfi")).toBe(true);
+    expect(isWorkflowTransitionAllowed("resolved", "open")).toBe(true);
+  });
+
+  test("derives issue and RFI statuses from the canonical workflow model", () => {
+    expect(getWorkflowStatuses("approved")).toEqual({
+      status: "draft_rfi",
+      rfi_status: "approved",
+    });
+    expect(getWorkflowStatuses("submitted")).toEqual({
+      status: "submitted",
+      rfi_status: "submitted_externally",
+    });
   });
 
   test("derives editable workflow draft from the issue and linked RFI", () => {

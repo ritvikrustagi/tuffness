@@ -30,6 +30,83 @@ CREATE INDEX IF NOT EXISTS idx_issues_trade ON public.issues(project_id, trade);
 CREATE INDEX IF NOT EXISTS idx_issues_due_date ON public.issues(project_id, due_date);
 CREATE INDEX IF NOT EXISTS idx_rfis_external_number ON public.rfis(project_id, external_rfi_number);
 
+CREATE TABLE IF NOT EXISTS public.issue_workflow_states (
+  workflow_state TEXT PRIMARY KEY,
+  issue_status public.issue_status NOT NULL,
+  rfi_status public.rfi_status NOT NULL,
+  summary_bucket TEXT NOT NULL,
+  creates_rfi BOOLEAN NOT NULL DEFAULT TRUE,
+
+  CONSTRAINT issue_workflow_states_summary_bucket_check CHECK (
+    summary_bucket IN (
+      'open_issues',
+      'draft_rfis',
+      'submitted_rfis',
+      'answered_awaiting_closeout',
+      'closed'
+    )
+  )
+);
+
+INSERT INTO public.issue_workflow_states (
+  workflow_state,
+  issue_status,
+  rfi_status,
+  summary_bucket,
+  creates_rfi
+)
+VALUES
+  ('open', 'open', 'draft', 'open_issues', FALSE),
+  ('acknowledged', 'acknowledged', 'draft', 'open_issues', FALSE),
+  ('draft_rfi', 'draft_rfi', 'draft', 'draft_rfis', TRUE),
+  ('needs_edit', 'draft_rfi', 'needs_edit', 'draft_rfis', TRUE),
+  ('approved', 'draft_rfi', 'approved', 'draft_rfis', TRUE),
+  ('submitted', 'submitted', 'submitted_externally', 'submitted_rfis', TRUE),
+  ('answered', 'answered', 'answered', 'answered_awaiting_closeout', TRUE),
+  ('resolved', 'resolved', 'closed', 'closed', TRUE),
+  ('dismissed', 'dismissed', 'closed', 'closed', TRUE)
+ON CONFLICT (workflow_state) DO UPDATE
+SET
+  issue_status = EXCLUDED.issue_status,
+  rfi_status = EXCLUDED.rfi_status,
+  summary_bucket = EXCLUDED.summary_bucket,
+  creates_rfi = EXCLUDED.creates_rfi;
+
+CREATE TABLE IF NOT EXISTS public.issue_workflow_transitions (
+  current_state TEXT NOT NULL REFERENCES public.issue_workflow_states(workflow_state) ON DELETE CASCADE,
+  next_state TEXT NOT NULL REFERENCES public.issue_workflow_states(workflow_state) ON DELETE CASCADE,
+  PRIMARY KEY (current_state, next_state)
+);
+
+INSERT INTO public.issue_workflow_transitions (current_state, next_state)
+VALUES
+  ('open', 'acknowledged'),
+  ('open', 'draft_rfi'),
+  ('open', 'resolved'),
+  ('open', 'dismissed'),
+  ('acknowledged', 'draft_rfi'),
+  ('acknowledged', 'resolved'),
+  ('acknowledged', 'dismissed'),
+  ('draft_rfi', 'needs_edit'),
+  ('draft_rfi', 'approved'),
+  ('draft_rfi', 'submitted'),
+  ('draft_rfi', 'resolved'),
+  ('draft_rfi', 'dismissed'),
+  ('needs_edit', 'draft_rfi'),
+  ('needs_edit', 'approved'),
+  ('needs_edit', 'resolved'),
+  ('needs_edit', 'dismissed'),
+  ('approved', 'needs_edit'),
+  ('approved', 'submitted'),
+  ('approved', 'resolved'),
+  ('approved', 'dismissed'),
+  ('submitted', 'answered'),
+  ('submitted', 'resolved'),
+  ('answered', 'resolved'),
+  ('resolved', 'open'),
+  ('dismissed', 'open')
+ON CONFLICT (current_state, next_state) DO NOTHING;
+
 CREATE OR REPLACE FUNCTION public.save_issue_workflow(
   p_project_id UUID,
   p_issue_id UUID,
@@ -47,6 +124,8 @@ DECLARE
   v_next_workflow_state TEXT;
   v_next_issue_status public.issue_status;
   v_next_rfi_status public.rfi_status;
+  v_next_creates_rfi BOOLEAN;
+  v_transition_allowed BOOLEAN;
   v_question TEXT;
 BEGIN
   SELECT *
@@ -69,73 +148,43 @@ BEGIN
   LIMIT 1
   FOR UPDATE;
 
-  v_current_workflow_state := CASE v_issue.status
-    WHEN 'draft_rfi' THEN
-      CASE v_existing_rfi_status
-        WHEN 'needs_edit' THEN 'needs_edit'
-        WHEN 'approved' THEN 'approved'
-        ELSE 'draft_rfi'
-      END
-    WHEN 'submitted' THEN 'submitted'
-    WHEN 'answered' THEN 'answered'
-    WHEN 'resolved' THEN 'resolved'
-    WHEN 'dismissed' THEN 'dismissed'
-    WHEN 'acknowledged' THEN 'acknowledged'
-    ELSE 'open'
-  END;
+  SELECT workflow_state
+  INTO v_current_workflow_state
+  FROM public.issue_workflow_states
+  WHERE issue_status = v_issue.status
+    AND (
+      v_issue.status <> 'draft_rfi'
+      OR rfi_status = COALESCE(v_existing_rfi_status, 'draft'::public.rfi_status)
+    )
+  LIMIT 1;
+
+  v_current_workflow_state := COALESCE(v_current_workflow_state, 'open');
 
   v_next_workflow_state := COALESCE(NULLIF(p_patch->>'workflow_state', ''), v_current_workflow_state);
 
-  IF v_next_workflow_state NOT IN (
-    'open',
-    'acknowledged',
-    'draft_rfi',
-    'needs_edit',
-    'approved',
-    'submitted',
-    'answered',
-    'resolved',
-    'dismissed'
-  ) THEN
+  SELECT issue_status, rfi_status, creates_rfi
+  INTO v_next_issue_status, v_next_rfi_status, v_next_creates_rfi
+  FROM public.issue_workflow_states
+  WHERE workflow_state = v_next_workflow_state;
+
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'Unknown workflow state %', v_next_workflow_state;
   END IF;
 
-  IF NOT (
+  SELECT (
     v_next_workflow_state = v_current_workflow_state
-    OR (v_current_workflow_state = 'open' AND v_next_workflow_state IN ('acknowledged', 'draft_rfi', 'resolved', 'dismissed'))
-    OR (v_current_workflow_state = 'acknowledged' AND v_next_workflow_state IN ('draft_rfi', 'resolved', 'dismissed'))
-    OR (v_current_workflow_state = 'draft_rfi' AND v_next_workflow_state IN ('needs_edit', 'approved', 'submitted', 'resolved', 'dismissed'))
-    OR (v_current_workflow_state = 'needs_edit' AND v_next_workflow_state IN ('draft_rfi', 'approved', 'resolved', 'dismissed'))
-    OR (v_current_workflow_state = 'approved' AND v_next_workflow_state IN ('needs_edit', 'submitted', 'resolved', 'dismissed'))
-    OR (v_current_workflow_state = 'submitted' AND v_next_workflow_state IN ('answered', 'resolved'))
-    OR (v_current_workflow_state = 'answered' AND v_next_workflow_state = 'resolved')
-    OR (v_current_workflow_state IN ('resolved', 'dismissed') AND v_next_workflow_state = 'open')
-  ) THEN
+    OR EXISTS (
+      SELECT 1
+      FROM public.issue_workflow_transitions
+      WHERE current_state = v_current_workflow_state
+        AND next_state = v_next_workflow_state
+    )
+  )
+  INTO v_transition_allowed;
+
+  IF NOT v_transition_allowed THEN
     RAISE EXCEPTION 'Invalid workflow transition from % to %', v_current_workflow_state, v_next_workflow_state;
   END IF;
-
-  v_next_issue_status := CASE v_next_workflow_state
-    WHEN 'open' THEN 'open'::public.issue_status
-    WHEN 'acknowledged' THEN 'acknowledged'::public.issue_status
-    WHEN 'draft_rfi' THEN 'draft_rfi'::public.issue_status
-    WHEN 'needs_edit' THEN 'draft_rfi'::public.issue_status
-    WHEN 'approved' THEN 'draft_rfi'::public.issue_status
-    WHEN 'submitted' THEN 'submitted'::public.issue_status
-    WHEN 'answered' THEN 'answered'::public.issue_status
-    WHEN 'resolved' THEN 'resolved'::public.issue_status
-    WHEN 'dismissed' THEN 'dismissed'::public.issue_status
-    ELSE 'open'::public.issue_status
-  END;
-
-  v_next_rfi_status := CASE v_next_workflow_state
-    WHEN 'needs_edit' THEN 'needs_edit'::public.rfi_status
-    WHEN 'approved' THEN 'approved'::public.rfi_status
-    WHEN 'submitted' THEN 'submitted_externally'::public.rfi_status
-    WHEN 'answered' THEN 'answered'::public.rfi_status
-    WHEN 'resolved' THEN 'closed'::public.rfi_status
-    WHEN 'dismissed' THEN 'closed'::public.rfi_status
-    ELSE 'draft'::public.rfi_status
-  END;
 
   IF p_patch ? 'status' AND (p_patch->>'status')::public.issue_status <> v_next_issue_status THEN
     RAISE EXCEPTION 'Issue status does not match workflow state %', v_next_workflow_state;
@@ -175,7 +224,7 @@ BEGIN
   WHERE id = p_issue_id
     AND project_id = p_project_id;
 
-  IF v_next_workflow_state IN ('draft_rfi', 'needs_edit', 'approved', 'submitted', 'answered', 'resolved', 'dismissed')
+  IF v_next_creates_rfi
     OR p_patch ? 'external_rfi_number'
     OR p_patch ? 'external_url'
     OR p_patch ? 'response'
