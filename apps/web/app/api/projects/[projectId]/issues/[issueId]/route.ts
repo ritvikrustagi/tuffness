@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProjectAccess } from "@/lib/api/auth";
 import {
-  buildIssueWorkflowPatch,
+  buildIssueWorkflowRpcPatch,
   deriveWorkflowState,
   isWorkflowTransitionAllowed,
   issueStatuses,
@@ -12,17 +12,17 @@ import {
 
 const issueUpdateSchema = z.object({
   workflow_state: z.enum(issueWorkflowStates),
-  status: z.enum(issueStatuses),
-  rfi_status: z.enum(rfiStatuses),
-  resolution_notes: z.string().max(4000),
-  trade: z.string().max(100),
-  discipline: z.string().max(100),
-  due_date: z.string(),
-  external_system_url: z.string().max(1000),
-  draft_rfi: z.string().max(4000),
-  external_rfi_number: z.string().max(100),
-  external_url: z.string().max(1000),
-  response: z.string().max(4000),
+  status: z.enum(issueStatuses).optional(),
+  rfi_status: z.enum(rfiStatuses).optional(),
+  resolution_notes: z.string().max(4000).nullable().optional(),
+  trade: z.string().max(100).nullable().optional(),
+  discipline: z.string().max(100).nullable().optional(),
+  due_date: z.string().nullable().optional(),
+  external_system_url: z.string().max(1000).nullable().optional(),
+  draft_rfi: z.string().max(4000).nullable().optional(),
+  external_rfi_number: z.string().max(100).nullable().optional(),
+  external_url: z.string().max(1000).nullable().optional(),
+  response: z.string().max(4000).nullable().optional(),
 });
 
 export async function PATCH(
@@ -76,7 +76,7 @@ export async function PATCH(
     p_project_id: projectId,
     p_issue_id: issueId,
     p_user_id: user.id,
-    p_patch: buildIssueWorkflowPatch(parsed.data),
+    p_patch: buildIssueWorkflowRpcPatch(parsed.data),
   });
 
   if (saveError) {

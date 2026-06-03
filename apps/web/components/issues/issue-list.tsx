@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Issue } from "@/lib/types/database";
 import {
+  buildDraftRfiExportText,
   buildIssueWorkflowPatch,
   getInitialIssueWorkflowDraft,
   type IssueWorkflowDraft,
@@ -72,10 +73,32 @@ export function IssueList({ projectId, issues }: { projectId: string; issues: Is
   }
 
   async function copyDraft(issueId: string) {
-    const draft = draftOverrides[issueId]?.draft_rfi ?? initialDrafts[issueId]?.draft_rfi;
-    if (!draft) return;
-    await navigator.clipboard.writeText(draft);
-    setMessage("Draft RFI copied.");
+    const issue = issues.find((item) => item.id === issueId);
+    if (!issue) return;
+    const draft = { ...initialDrafts[issueId], ...draftOverrides[issueId] };
+    if (!draft?.draft_rfi) return;
+    await navigator.clipboard.writeText(buildDraftRfiExportText({ issue, draft }));
+    setMessage("Draft RFI copied with evidence.");
+    setError(null);
+  }
+
+  function exportDraft(issueId: string) {
+    const issue = issues.find((item) => item.id === issueId);
+    if (!issue) return;
+    const draft = { ...initialDrafts[issueId], ...draftOverrides[issueId] };
+    if (!draft?.draft_rfi) return;
+
+    const blob = new Blob([buildDraftRfiExportText({ issue, draft })], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeSubject = issue.summary.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    link.href = url;
+    link.download = `${safeSubject || "draft-rfi"}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage("Draft RFI exported.");
     setError(null);
   }
 
@@ -104,6 +127,7 @@ export function IssueList({ projectId, issues }: { projectId: string; issues: Is
           onDraftChange={(patch) => updateDraft(issue.id, patch)}
           onSave={() => saveIssue(issue)}
           onCopy={() => copyDraft(issue.id)}
+          onExport={() => exportDraft(issue.id)}
         />
       ))}
     </div>

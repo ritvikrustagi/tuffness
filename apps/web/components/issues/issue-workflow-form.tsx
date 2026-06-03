@@ -17,12 +17,14 @@ export function IssueWorkflowForm({
   onChange,
   onSave,
   onCopy,
+  onExport,
 }: {
   draft: IssueWorkflowDraft;
   saving: boolean;
   onChange: (patch: Partial<IssueWorkflowDraft>) => void;
   onSave: () => void;
   onCopy: () => void;
+  onExport: () => void;
 }) {
   return (
     <>
@@ -138,6 +140,9 @@ export function IssueWorkflowForm({
         </Button>
         <Button type="button" variant="secondary" onClick={onCopy} disabled={!draft.draft_rfi}>
           Copy Draft RFI
+        </Button>
+        <Button type="button" variant="secondary" onClick={onExport} disabled={!draft.draft_rfi}>
+          Export Text
         </Button>
       </div>
     </>

@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vitest";
 import {
+  buildDraftRfiExportText,
   buildIssueWorkflowPatch,
   deriveWorkflowState,
   getAllowedIssueTransitions,
   getInitialIssueWorkflowDraft,
   isIssueTransitionAllowed,
   normalizeIssueEvidence,
+  summarizeIssueWorkflows,
 } from "./workflow";
 
 describe("RFI issue workflow", () => {
@@ -124,5 +126,69 @@ describe("RFI issue workflow", () => {
         quote: "Door 101 hardware set is omitted.",
       },
     ]);
+  });
+
+  test("summarizes dashboard counts from canonical workflow state", () => {
+    expect(
+      summarizeIssueWorkflows([
+        { status: "open", rfis: [] },
+        { status: "acknowledged", rfis: [] },
+        { status: "draft_rfi", rfis: [{ status: "draft" }] },
+        { status: "draft_rfi", rfis: [{ status: "needs_edit" }] },
+        { status: "draft_rfi", rfis: [{ status: "approved" }] },
+        { status: "submitted", rfis: [{ status: "submitted_externally" }] },
+        { status: "answered", rfis: [{ status: "answered" }] },
+        { status: "resolved", rfis: [{ status: "closed" }] },
+        { status: "dismissed", rfis: [{ status: "closed" }] },
+      ])
+    ).toEqual({
+      total: 9,
+      open_issues: 2,
+      draft_rfis: 3,
+      submitted_rfis: 1,
+      answered_awaiting_closeout: 1,
+      closed: 2,
+    });
+  });
+
+  test("builds a paste-ready draft RFI export with evidence and external fields", () => {
+    const text = buildDraftRfiExportText({
+      issue: {
+        summary: "Door hardware conflict",
+        description: "A601 omits hardware set while spec requires one.",
+        severity: "high",
+        trade: "doors",
+        discipline: "architectural",
+        due_date: "2026-06-15",
+        evidence: [
+          {
+            document_id: "doc-1",
+            document_name: "A601 Door Schedule",
+            page_number: 12,
+            quote: "Door 101 hardware set is omitted.",
+          },
+        ],
+      },
+      draft: {
+        workflow_state: "approved",
+        status: "draft_rfi",
+        rfi_status: "approved",
+        trade: "doors",
+        discipline: "architectural",
+        due_date: "2026-06-15",
+        external_system_url: "https://example.com/issues/door",
+        external_rfi_number: "RFI-042",
+        external_url: "https://example.com/rfis/42",
+        response: "",
+        resolution_notes: "",
+        draft_rfi: "Please confirm the required hardware set for Door 101.",
+      },
+    });
+
+    expect(text).toContain("Subject: Door hardware conflict");
+    expect(text).toContain("Question:\nPlease confirm the required hardware set for Door 101.");
+    expect(text).toContain("Evidence:\n1. A601 Door Schedule, page 12: Door 101 hardware set is omitted.");
+    expect(text).toContain("External RFI Number: RFI-042");
+    expect(text).not.toContain("undefined");
   });
 });

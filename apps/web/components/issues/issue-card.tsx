@@ -5,7 +5,6 @@ import {
   evidenceText,
   formatIssueType,
   formatStatus,
-  getRfi,
   severityColors,
 } from "@/components/issues/issue-display";
 import { IssueWorkflowForm } from "@/components/issues/issue-workflow-form";
@@ -17,6 +16,7 @@ export function IssueCard({
   onDraftChange,
   onSave,
   onCopy,
+  onExport,
 }: {
   issue: Issue;
   draft: IssueWorkflowDraft;
@@ -24,9 +24,8 @@ export function IssueCard({
   onDraftChange: (patch: Partial<IssueWorkflowDraft>) => void;
   onSave: () => void;
   onCopy: () => void;
+  onExport: () => void;
 }) {
-  const rfi = getRfi(issue);
-
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -44,13 +43,8 @@ export function IssueCard({
             {issue.severity}
           </span>
           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium capitalize text-blue-800">
-            issue: {formatStatus(issue.status)}
+            workflow: {formatStatus(draft.workflow_state)}
           </span>
-          {rfi && (
-            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium capitalize text-purple-800">
-              rfi: {formatStatus(rfi.status)}
-            </span>
-          )}
         </div>
       </div>
 
@@ -92,6 +86,7 @@ export function IssueCard({
         onChange={onDraftChange}
         onSave={onSave}
         onCopy={onCopy}
+        onExport={onExport}
       />
     </Card>
   );

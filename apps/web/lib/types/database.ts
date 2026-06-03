@@ -88,6 +88,26 @@ export type RfiStatus =
   | "closed";
 export type AgentType = "rfi_scan" | "rfi_agent" | "submittal_review" | "document_process";
 export type AgentRunStatus = "pending" | "running" | "completed" | "failed";
+export type IntegrationProvider =
+  | "manual"
+  | "email"
+  | "procore"
+  | "autodesk_build"
+  | "sharepoint_onedrive"
+  | "bluebeam"
+  | "csv";
+export type ExternalConnectionStatus = "connected" | "disconnected" | "error";
+export type IntegrationOperation =
+  | "connect_account"
+  | "list_projects"
+  | "map_project"
+  | "import_documents"
+  | "import_rfis"
+  | "export_rfi"
+  | "sync_rfi_status"
+  | "disconnect_account";
+export type IntegrationSyncRunStatus = "pending" | "running" | "completed" | "failed";
+export type IntegrationSyncEventStatus = "completed" | "failed" | "conflict";
 
 export interface IssueEvidence {
   document_id: string;
@@ -206,5 +226,81 @@ export interface AgentRun {
   started_at: string | null;
   completed_at: string | null;
   triggered_by: string | null;
+  created_at: string;
+}
+
+export interface ExternalConnection {
+  id: string;
+  organization_id: string;
+  provider: IntegrationProvider;
+  status: ExternalConnectionStatus;
+  account_label: string | null;
+  external_account_id: string | null;
+  token_reference: string | null;
+  metadata: Record<string, unknown>;
+  last_sync_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalProjectMapping {
+  id: string;
+  connection_id: string | null;
+  organization_id: string;
+  project_id: string;
+  provider: IntegrationProvider;
+  external_project_id: string;
+  external_project_url: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalRecordLink {
+  id: string;
+  connection_id: string | null;
+  organization_id: string;
+  project_id: string;
+  provider: IntegrationProvider;
+  internal_table: "documents" | "issues" | "rfis" | "submittals";
+  internal_id: string;
+  external_id: string;
+  external_url: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntegrationSyncRun {
+  id: string;
+  connection_id: string | null;
+  organization_id: string;
+  project_id: string | null;
+  provider: IntegrationProvider;
+  operation: IntegrationOperation;
+  status: IntegrationSyncRunStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+  input_params: Record<string, unknown>;
+  result_summary: Record<string, unknown>;
+  triggered_by: string | null;
+  created_at: string;
+}
+
+export interface IntegrationSyncEvent {
+  id: string;
+  sync_run_id: string;
+  organization_id: string;
+  project_id: string | null;
+  provider: IntegrationProvider;
+  event_type: string;
+  internal_table: "documents" | "issues" | "rfis" | "submittals" | null;
+  internal_id: string | null;
+  external_id: string | null;
+  status: IntegrationSyncEventStatus;
+  error_message: string | null;
+  payload: Record<string, unknown>;
   created_at: string;
 }
