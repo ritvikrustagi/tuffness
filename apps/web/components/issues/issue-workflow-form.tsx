@@ -28,7 +28,11 @@ export function IssueWorkflowForm({
 }) {
   return (
     <>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Workflow</h4>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 md:col-span-2">
           Workflow state
           <select
@@ -86,8 +90,49 @@ export function IssueWorkflowForm({
           />
         </label>
 
-        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 md:col-span-2">
-          External URL
+      </div>
+
+      <div className="mt-5 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">RFI draft</h4>
+      </div>
+
+      <label className="mt-3 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+        Subject
+        <Input
+          className="mt-1"
+          value={draft.subject}
+          onChange={(event) => onChange({ subject: event.target.value })}
+          placeholder="Door hardware conflict"
+        />
+      </label>
+
+      <label className="mt-3 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+        Question
+        <textarea
+          className="mt-1 min-h-32 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-orange-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+          value={draft.draft_rfi}
+          onChange={(event) => onChange({ draft_rfi: event.target.value })}
+        />
+      </label>
+
+      <label className="mt-3 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+        Background / context
+        <textarea
+          className="mt-1 min-h-24 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-orange-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+          value={draft.description}
+          onChange={(event) => onChange({ description: event.target.value })}
+        />
+      </label>
+
+      <div className="mt-5 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          External tracking
+        </h4>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+          External RFI URL
           <Input
             className="mt-1"
             value={draft.external_url}
@@ -96,7 +141,7 @@ export function IssueWorkflowForm({
           />
         </label>
 
-        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 lg:col-span-4">
+        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
           External issue URL
           <Input
             className="mt-1"
@@ -107,14 +152,9 @@ export function IssueWorkflowForm({
         </label>
       </div>
 
-      <label className="mt-4 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-        Draft RFI
-        <textarea
-          className="mt-1 min-h-32 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-orange-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-          value={draft.draft_rfi}
-          onChange={(event) => onChange({ draft_rfi: event.target.value })}
-        />
-      </label>
+      <div className="mt-5 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Closeout</h4>
+      </div>
 
       <label className="mt-3 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
         Response

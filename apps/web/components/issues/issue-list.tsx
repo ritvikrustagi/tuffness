@@ -121,6 +121,7 @@ export function IssueList({ projectId, issues }: { projectId: string; issues: Is
       {issues.map((issue) => (
         <IssueCard
           key={issue.id}
+          projectId={projectId}
           issue={issue}
           draft={{ ...initialDrafts[issue.id], ...draftOverrides[issue.id] }}
           saving={savingId === issue.id}

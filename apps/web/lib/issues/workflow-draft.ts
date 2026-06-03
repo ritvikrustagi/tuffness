@@ -9,6 +9,7 @@ export type IssueWorkflowDraft = {
   workflow_state: IssueWorkflowState;
   status: IssueStatus;
   rfi_status: RfiStatus;
+  subject: string;
   trade: string;
   discipline: string;
   due_date: string;
@@ -17,21 +18,25 @@ export type IssueWorkflowDraft = {
   external_url: string;
   response: string;
   resolution_notes: string;
+  description: string;
   draft_rfi: string;
 };
 
 type WorkflowIssueInput = {
+  summary: string;
   status: IssueStatus;
   trade: string | null;
   discipline: string | null;
   due_date: string | null;
   external_system_url: string | null;
   resolution_notes: string | null;
+  description: string | null;
   draft_rfi: string | null;
 };
 
 type WorkflowRfiInput = {
   status: RfiStatus;
+  subject: string;
   external_rfi_number: string | null;
   external_url: string | null;
   question: string;
@@ -64,6 +69,7 @@ export function getInitialIssueWorkflowDraft(input: {
     workflow_state,
     status: statuses.status,
     rfi_status: statuses.rfi_status,
+    subject: rfi?.subject ?? issue.summary,
     trade: issue.trade ?? "",
     discipline: issue.discipline ?? "",
     due_date: issue.due_date ?? "",
@@ -72,6 +78,7 @@ export function getInitialIssueWorkflowDraft(input: {
     external_url: rfi?.external_url ?? "",
     response: rfi?.response ?? "",
     resolution_notes: issue.resolution_notes ?? "",
+    description: issue.description ?? "",
     draft_rfi: rfi?.question ?? issue.draft_rfi ?? "",
   };
 }
@@ -80,6 +87,7 @@ export function buildIssueWorkflowPatch(input: IssueWorkflowDraft): {
   workflow_state: IssueWorkflowState;
   status: IssueStatus;
   rfi_status: RfiStatus;
+  subject: string | null;
   trade: string | null;
   discipline: string | null;
   due_date: string | null;
@@ -88,6 +96,7 @@ export function buildIssueWorkflowPatch(input: IssueWorkflowDraft): {
   external_url: string | null;
   response: string | null;
   resolution_notes: string | null;
+  description: string | null;
   draft_rfi: string | null;
 } {
   const statuses = getWorkflowStatuses(input.workflow_state);
@@ -96,6 +105,7 @@ export function buildIssueWorkflowPatch(input: IssueWorkflowDraft): {
     workflow_state: input.workflow_state,
     status: statuses.status,
     rfi_status: statuses.rfi_status,
+    subject: cleanText(input.subject),
     trade: cleanText(input.trade),
     discipline: cleanText(input.discipline),
     due_date: cleanText(input.due_date),
@@ -104,6 +114,7 @@ export function buildIssueWorkflowPatch(input: IssueWorkflowDraft): {
     external_url: cleanText(input.external_url),
     response: cleanText(input.response),
     resolution_notes: cleanText(input.resolution_notes),
+    description: cleanText(input.description),
     draft_rfi: cleanText(input.draft_rfi),
   };
 }
@@ -112,6 +123,7 @@ export function buildIssueWorkflowRpcPatch(input: {
   workflow_state: IssueWorkflowState;
   status?: IssueStatus;
   rfi_status?: RfiStatus;
+  subject?: string | null;
   trade?: string | null;
   discipline?: string | null;
   due_date?: string | null;
@@ -120,6 +132,7 @@ export function buildIssueWorkflowRpcPatch(input: {
   external_url?: string | null;
   response?: string | null;
   resolution_notes?: string | null;
+  description?: string | null;
   draft_rfi?: string | null;
 }): Record<string, string | null> {
   const patch: Record<string, string | null> = {
@@ -129,6 +142,7 @@ export function buildIssueWorkflowRpcPatch(input: {
   const fields = [
     "status",
     "rfi_status",
+    "subject",
     "trade",
     "discipline",
     "due_date",
@@ -137,6 +151,7 @@ export function buildIssueWorkflowRpcPatch(input: {
     "external_url",
     "response",
     "resolution_notes",
+    "description",
     "draft_rfi",
   ] as const;
 

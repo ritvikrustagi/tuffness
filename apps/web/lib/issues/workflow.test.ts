@@ -42,16 +42,19 @@ describe("RFI issue workflow", () => {
     expect(
       getInitialIssueWorkflowDraft({
         issue: {
+          summary: "Door hardware conflict",
           status: "draft_rfi",
           trade: "doors",
           due_date: "2026-06-12",
           discipline: null,
           resolution_notes: null,
+          description: "Issue background",
           external_system_url: null,
           draft_rfi: "Issue draft",
         },
         rfi: {
           status: "needs_edit",
+          subject: "Door hardware question",
           external_rfi_number: "RFI-007",
           external_url: "https://example.com/rfis/7",
           question: "Linked RFI question",
@@ -62,6 +65,7 @@ describe("RFI issue workflow", () => {
       workflow_state: "needs_edit",
       status: "draft_rfi",
       rfi_status: "needs_edit",
+      subject: "Door hardware question",
       trade: "doors",
       discipline: "",
       due_date: "2026-06-12",
@@ -70,6 +74,7 @@ describe("RFI issue workflow", () => {
       external_url: "https://example.com/rfis/7",
       response: "",
       resolution_notes: "",
+      description: "Issue background",
       draft_rfi: "Linked RFI question",
     });
   });
@@ -93,6 +98,7 @@ describe("RFI issue workflow", () => {
         workflow_state: "approved",
         status: "draft_rfi",
         rfi_status: "needs_edit",
+        subject: " Door hardware ",
         trade: " doors ",
         discipline: "",
         due_date: "2026-06-15",
@@ -101,12 +107,14 @@ describe("RFI issue workflow", () => {
         external_url: " https://example.com/rfis/42 ",
         response: "",
         resolution_notes: " needs owner response ",
+        description: " Conflicting requirements between A601 and spec. ",
         draft_rfi: " Confirm door hardware set. ",
       })
     ).toEqual({
       workflow_state: "approved",
       status: "draft_rfi",
       rfi_status: "approved",
+      subject: "Door hardware",
       trade: "doors",
       discipline: null,
       due_date: "2026-06-15",
@@ -115,6 +123,7 @@ describe("RFI issue workflow", () => {
       external_url: "https://example.com/rfis/42",
       response: null,
       resolution_notes: "needs owner response",
+      description: "Conflicting requirements between A601 and spec.",
       draft_rfi: "Confirm door hardware set.",
     });
   });
@@ -185,6 +194,7 @@ describe("RFI issue workflow", () => {
         workflow_state: "approved",
         status: "draft_rfi",
         rfi_status: "approved",
+        subject: "Door hardware conflict",
         trade: "doors",
         discipline: "architectural",
         due_date: "2026-06-15",
@@ -193,6 +203,7 @@ describe("RFI issue workflow", () => {
         external_url: "https://example.com/rfis/42",
         response: "",
         resolution_notes: "",
+        description: "A601 omits hardware set while spec requires one.",
         draft_rfi: "Please confirm the required hardware set for Door 101.",
       },
     });

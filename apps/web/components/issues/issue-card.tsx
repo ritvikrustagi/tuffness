@@ -1,6 +1,7 @@
 import type { Issue } from "@/lib/types/database";
 import type { IssueWorkflowDraft } from "@/lib/issues/workflow";
 import { Card } from "@/components/ui/card";
+import { SourceViewer } from "@/components/documents/source-viewer";
 import {
   evidenceText,
   formatIssueType,
@@ -10,6 +11,7 @@ import {
 import { IssueWorkflowForm } from "@/components/issues/issue-workflow-form";
 
 export function IssueCard({
+  projectId,
   issue,
   draft,
   saving,
@@ -18,6 +20,7 @@ export function IssueCard({
   onCopy,
   onExport,
 }: {
+  projectId: string;
   issue: Issue;
   draft: IssueWorkflowDraft;
   saving: boolean;
@@ -74,6 +77,7 @@ export function IssueCard({
                 <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
                   {evidenceText(item)}
                 </p>
+                <SourceViewer projectId={projectId} evidence={item} />
               </div>
             ))}
           </div>

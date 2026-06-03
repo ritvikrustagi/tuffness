@@ -15,7 +15,8 @@ export function ProjectTabs({
   const base = `/projects/${projectId}`;
 
   const tabs = [
-    { href: base, label: "Documents", exact: true },
+    { href: base, label: "Overview", exact: true },
+    { href: `${base}/documents`, label: "Documents", exact: false },
     { href: `${base}/chat`, label: "Chat", exact: false },
     { href: `${base}/issues`, label: "RFIs", exact: false },
     { href: `${base}/submittals`, label: "Submittals", exact: false },

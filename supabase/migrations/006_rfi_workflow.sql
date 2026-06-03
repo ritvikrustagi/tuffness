@@ -217,6 +217,10 @@ BEGIN
       WHEN p_patch ? 'external_system_url' THEN NULLIF(p_patch->>'external_system_url', '')
       ELSE external_system_url
     END,
+    description = CASE
+      WHEN p_patch ? 'description' THEN NULLIF(p_patch->>'description', '')
+      ELSE description
+    END,
     draft_rfi = CASE
       WHEN p_patch ? 'draft_rfi' THEN NULLIF(p_patch->>'draft_rfi', '')
       ELSE draft_rfi
@@ -256,7 +260,7 @@ BEGIN
         p_project_id,
         v_issue.organization_id,
         p_issue_id,
-        LEFT(v_issue.summary, 200),
+        LEFT(COALESCE(NULLIF(p_patch->>'subject', ''), v_issue.summary), 200),
         v_question,
         v_next_rfi_status,
         NULLIF(p_patch->>'response', ''),
@@ -270,6 +274,10 @@ BEGIN
       UPDATE public.rfis
       SET
         status = v_next_rfi_status,
+        subject = CASE
+          WHEN p_patch ? 'subject' THEN LEFT(COALESCE(NULLIF(p_patch->>'subject', ''), subject), 200)
+          ELSE subject
+        END,
         question = CASE
           WHEN p_patch ? 'draft_rfi' THEN v_question
           ELSE question

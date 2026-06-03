@@ -14,7 +14,7 @@ export function buildDraftRfiExportText(input: {
   draft: IssueWorkflowDraft;
 }): string {
   const lines: string[] = [
-    `Subject: ${input.issue.summary}`,
+    `Subject: ${input.draft.subject.trim() || input.issue.summary}`,
     "",
     "Question:",
     input.draft.draft_rfi.trim(),
@@ -31,8 +31,9 @@ export function buildDraftRfiExportText(input: {
     lines.push("", "Metadata:", ...metadata);
   }
 
-  if (input.issue.description) {
-    lines.push("", "Background:", input.issue.description.trim());
+  const background = input.draft.description.trim() || input.issue.description;
+  if (background) {
+    lines.push("", "Background:", background.trim());
   }
 
   if (input.issue.evidence.length > 0) {
