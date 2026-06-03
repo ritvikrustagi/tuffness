@@ -1,30 +1,26 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProjectAccess } from "@/lib/api/auth";
-import { buildDraftRfiPatch, issueStatuses, rfiStatuses } from "@/lib/issues/workflow";
+import {
+  buildIssueWorkflowPatch,
+  isIssueTransitionAllowed,
+  issueStatuses,
+  rfiStatuses,
+} from "@/lib/issues/workflow";
 
 const issueUpdateSchema = z.object({
-  status: z.enum(issueStatuses).optional(),
-  resolution_notes: z.string().max(4000).nullable().optional(),
-  trade: z.string().max(100).nullable().optional(),
-  discipline: z.string().max(100).nullable().optional(),
-  due_date: z.string().nullable().optional(),
-  external_system_url: z.string().max(1000).nullable().optional(),
-  draft_rfi: z.string().max(4000).nullable().optional(),
-  rfi_status: z.enum(rfiStatuses).optional(),
-  external_rfi_number: z.string().max(100).nullable().optional(),
-  external_url: z.string().max(1000).nullable().optional(),
-  response: z.string().max(4000).nullable().optional(),
+  status: z.enum(issueStatuses),
+  rfi_status: z.enum(rfiStatuses),
+  resolution_notes: z.string().max(4000),
+  trade: z.string().max(100),
+  discipline: z.string().max(100),
+  due_date: z.string(),
+  external_system_url: z.string().max(1000),
+  draft_rfi: z.string().max(4000),
+  external_rfi_number: z.string().max(100),
+  external_url: z.string().max(1000),
+  response: z.string().max(4000),
 });
-
-function cleanText(value: string | null): string | null;
-function cleanText(value: string | null | undefined): string | null | undefined;
-function cleanText(value: string | null | undefined) {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
 
 export async function PATCH(
   request: Request,
@@ -41,7 +37,7 @@ export async function PATCH(
 
   const { data: existingIssue, error: existingError } = await supabase
     .from("issues")
-    .select("*, rfis(*)")
+    .select("id, project_id, status")
     .eq("id", issueId)
     .eq("project_id", projectId)
     .maybeSingle();
@@ -54,86 +50,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Issue not found" }, { status: 404 });
   }
 
-  const issuePatch: Record<string, string | null> = {};
-  const input = parsed.data;
-
-  if (input.status !== undefined) issuePatch.status = input.status;
-  if (input.resolution_notes !== undefined) {
-    issuePatch.resolution_notes = cleanText(input.resolution_notes);
-  }
-  if (input.trade !== undefined) issuePatch.trade = cleanText(input.trade);
-  if (input.discipline !== undefined) issuePatch.discipline = cleanText(input.discipline);
-  if (input.due_date !== undefined) issuePatch.due_date = cleanText(input.due_date);
-  if (input.external_system_url !== undefined) {
-    issuePatch.external_system_url = cleanText(input.external_system_url);
-  }
-  if (input.draft_rfi !== undefined) issuePatch.draft_rfi = cleanText(input.draft_rfi);
-
-  if (Object.keys(issuePatch).length > 0) {
-    const { error: issueError } = await supabase
-      .from("issues")
-      .update(issuePatch)
-      .eq("id", issueId)
-      .eq("project_id", projectId);
-
-    if (issueError) {
-      return NextResponse.json({ error: issueError.message }, { status: 500 });
-    }
+  if (!isIssueTransitionAllowed(existingIssue.status, parsed.data.status)) {
+    return NextResponse.json(
+      { error: `Cannot move issue from ${existingIssue.status} to ${parsed.data.status}` },
+      { status: 400 }
+    );
   }
 
-  const shouldUpdateRfi =
-    input.rfi_status !== undefined ||
-    input.external_rfi_number !== undefined ||
-    input.external_url !== undefined ||
-    input.response !== undefined ||
-    input.draft_rfi !== undefined;
+  const { error: saveError } = await supabase.rpc("save_issue_workflow", {
+    p_project_id: projectId,
+    p_issue_id: issueId,
+    p_user_id: user.id,
+    p_patch: buildIssueWorkflowPatch(parsed.data),
+  });
 
-  if (shouldUpdateRfi) {
-    const existingRfis = Array.isArray(existingIssue.rfis)
-      ? existingIssue.rfis
-      : existingIssue.rfis
-        ? [existingIssue.rfis]
-        : [];
-    const existingRfi = existingRfis[0];
-    const nextStatus = input.rfi_status ?? existingRfi?.status ?? "draft";
-    const rfiPatch = {
-      ...buildDraftRfiPatch({
-        status: nextStatus,
-        external_rfi_number: cleanText(input.external_rfi_number) ?? undefined,
-        external_url: cleanText(input.external_url) ?? undefined,
-        response: cleanText(input.response) ?? undefined,
-      }),
-      question:
-        cleanText(input.draft_rfi) ??
-        existingRfi?.question ??
-        existingIssue.draft_rfi ??
-        "Draft RFI pending human review.",
-    };
-
-    if (existingRfi?.id) {
-      const { error: rfiError } = await supabase
-        .from("rfis")
-        .update(rfiPatch)
-        .eq("id", existingRfi.id)
-        .eq("project_id", projectId);
-
-      if (rfiError) {
-        return NextResponse.json({ error: rfiError.message }, { status: 500 });
-      }
-    } else {
-      const { error: rfiError } = await supabase.from("rfis").insert({
-        project_id: projectId,
-        organization_id: project.organization_id,
-        issue_id: issueId,
-        subject: existingIssue.summary.slice(0, 200),
-        created_by: user.id,
-        ...rfiPatch,
-      });
-
-      if (rfiError) {
-        return NextResponse.json({ error: rfiError.message }, { status: 500 });
-      }
-    }
+  if (saveError) {
+    return NextResponse.json({ error: saveError.message }, { status: 500 });
   }
 
   const { data: issue, error } = await supabase
