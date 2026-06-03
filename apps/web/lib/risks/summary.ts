@@ -27,7 +27,10 @@ export function summarizeRisks(risks: RiskLike[]): RiskSummary {
       }
 
       summary.open += 1;
-      summary.awaiting_review += 1;
+
+      if (!risk.id?.startsWith("reviewed:")) {
+        summary.awaiting_review += 1;
+      }
 
       if (risk.risk_tier === "critical" || risk.risk_tier === "high") {
         summary.critical_or_high += 1;

@@ -52,6 +52,7 @@ export type RiskEvidence = {
 };
 
 export type RiskLike = {
+  id?: string;
   summary?: string | null;
   status?: IssueStatus | null;
   risk_tier?: RiskTier | null;

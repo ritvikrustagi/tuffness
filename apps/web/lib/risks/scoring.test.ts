@@ -56,21 +56,22 @@ describe("risk scoring", () => {
     const result = calculateRiskScore({
       severity: "high",
       schedule_impact: "critical",
-      cost_impact: "low",
+      cost_impact: "medium",
       compliance_impact: "none",
-      confidence: 0.25,
+      confidence: 0.42,
       evidence_count: 1,
       blocks_work: true,
     });
 
     expect(result.risk_tier).toBe("high");
+    expect(result.risk_score).toBeGreaterThanOrEqual(60);
     expect(result.risk_score).toBeLessThan(90);
   });
 
   test("getRiskTier maps thresholds", () => {
-    expect(getRiskTier(90)).toBe("critical");
-    expect(getRiskTier(70)).toBe("high");
-    expect(getRiskTier(45)).toBe("medium");
+    expect(getRiskTier(85)).toBe("critical");
+    expect(getRiskTier(60)).toBe("high");
+    expect(getRiskTier(30)).toBe("medium");
     expect(getRiskTier(10)).toBe("low");
   });
 });

@@ -14,27 +14,27 @@ export type RiskScoreInput = {
 const impactWeights: Record<ImpactLevel, number> = {
   none: 0,
   low: 10,
-  medium: 22,
-  high: 36,
-  critical: 54,
+  medium: 24,
+  high: 38,
+  critical: 52,
 };
 
 const severityWeights: Record<IssueSeverity, number> = {
-  low: 8,
-  medium: 20,
-  high: 34,
-  critical: 52,
+  low: 4,
+  medium: 12,
+  high: 22,
+  critical: 32,
 };
 
 const complianceWeights: Record<ComplianceImpact, number> = {
   none: 0,
-  possible_noncompliance: 16,
-  spec_deviation: 18,
+  possible_noncompliance: 18,
+  spec_deviation: 28,
   code_or_life_safety: 58,
-  submittal_required: 12,
-  owner_approval_required: 12,
-  inspection_or_testing_required: 16,
-  closeout_required: 10,
+  submittal_required: 22,
+  owner_approval_required: 24,
+  inspection_or_testing_required: 26,
+  closeout_required: 18,
 };
 
 function clampScore(score: number) {
@@ -45,15 +45,21 @@ export function calculateRiskScore(risk: RiskScoreInput) {
   const confidence = Math.max(0, Math.min(1, risk.confidence ?? 0.7));
   const costImpact = impactWeights[risk.cost_impact ?? "none"];
   const scheduleImpact = impactWeights[risk.schedule_impact ?? "none"];
+  const strongestImpact = Math.max(costImpact, scheduleImpact);
   const severityImpact = severityWeights[risk.severity ?? "medium"];
   const complianceImpact = complianceWeights[risk.compliance_impact ?? "none"];
-  const evidenceImpact = Math.min(8, Math.max(0, risk.evidence_count ?? 0) * 2);
-  const blockerImpact = risk.blocks_work ? 8 : 0;
+  const evidenceBonus = Math.min(Math.max(0, risk.evidence_count ?? 0), 3) * 4;
+  const blockerBonus = risk.blocks_work ? 10 : 0;
+  const confidenceModifier = confidence < 0.5 ? -12 : confidence >= 0.8 ? 8 : 0;
 
   const rawScore =
-    severityImpact + costImpact + scheduleImpact + complianceImpact + evidenceImpact + blockerImpact;
-  const confidenceAdjustedScore = rawScore * (0.75 + confidence * 0.25);
-  const risk_score = clampScore(confidenceAdjustedScore);
+    strongestImpact +
+    severityImpact +
+    complianceImpact +
+    evidenceBonus +
+    blockerBonus +
+    confidenceModifier;
+  const risk_score = clampScore(rawScore);
 
   return {
     risk_score,
@@ -64,8 +70,8 @@ export function calculateRiskScore(risk: RiskScoreInput) {
 export function getRiskTier(score: number): RiskTier {
   const clampedScore = clampScore(score);
 
-  if (clampedScore >= 90) return "critical";
-  if (clampedScore >= 70) return "high";
-  if (clampedScore >= 45) return "medium";
+  if (clampedScore >= 85) return "critical";
+  if (clampedScore >= 60) return "high";
+  if (clampedScore >= 30) return "medium";
   return "low";
 }

@@ -5,6 +5,7 @@ import type { RiskLike } from "./types";
 
 const sampleRisks = [
   {
+    id: "risk-1",
     summary: 'Door rating "gap"',
     status: "open",
     risk_tier: "critical",
@@ -28,6 +29,7 @@ const sampleRisks = [
     ],
   },
   {
+    id: "risk-2",
     summary: "Submittal missing",
     status: "acknowledged",
     risk_tier: "high",
@@ -45,6 +47,7 @@ const sampleRisks = [
     evidence: [],
   },
   {
+    id: "risk-3",
     summary: "Closed coordination note",
     status: "resolved",
     risk_tier: "medium",
@@ -61,19 +64,41 @@ const sampleRisks = [
     recommended_action: null,
     evidence: [],
   },
+  {
+    id: "reviewed:risk-4",
+    summary: "Reviewed owner approval",
+    status: "acknowledged",
+    risk_tier: "medium",
+    risk_category: "owner_design_approval",
+    cost_impact: "none",
+    schedule_impact: "low",
+    compliance_impact: "owner_approval_required",
+    trade: "Millwork",
+    responsible_party: "Owner",
+    spec_section: null,
+    drawing_sheet: "A901",
+    required_artifact: "owner_approval",
+    confidence: 0.65,
+    recommended_action: "Track owner approval.",
+    evidence: [],
+  },
 ] satisfies RiskLike[];
 
 describe("risk summaries", () => {
   test("summarizeRisks returns dashboard counters", () => {
     expect(summarizeRisks(sampleRisks)).toEqual({
-      total: 3,
-      open: 2,
+      total: 4,
+      open: 3,
       critical_or_high: 2,
-      compliance_exposure: 2,
+      compliance_exposure: 3,
       draft_rfis_needed: 1,
       awaiting_review: 2,
       closed: 1,
     });
+  });
+
+  test("reviewed non-closed risks do not count as awaiting review", () => {
+    expect(summarizeRisks(sampleRisks).awaiting_review).toBe(2);
   });
 
   test("buildRiskCsv emits header, quoted critical row, and evidence text", () => {
