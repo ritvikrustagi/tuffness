@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
-  buildDraftRfiPatch,
   buildIssueWorkflowPatch,
+  deriveWorkflowState,
   getAllowedIssueTransitions,
   getInitialIssueWorkflowDraft,
   isIssueTransitionAllowed,
@@ -45,6 +45,7 @@ describe("RFI issue workflow", () => {
         },
       })
     ).toEqual({
+      workflow_state: "needs_edit",
       status: "draft_rfi",
       rfi_status: "needs_edit",
       trade: "doors",
@@ -59,26 +60,25 @@ describe("RFI issue workflow", () => {
     });
   });
 
-  test("builds a manual external submission patch", () => {
+  test("derives one workflow state from issue and RFI statuses", () => {
+    expect(deriveWorkflowState({ issueStatus: "open", rfiStatus: null })).toBe("open");
+    expect(deriveWorkflowState({ issueStatus: "draft_rfi", rfiStatus: "approved" })).toBe(
+      "approved"
+    );
     expect(
-      buildDraftRfiPatch({
-        status: "submitted_externally",
-        external_rfi_number: "RFI-042",
-        external_url: "https://example.com/rfis/42",
-      })
-    ).toEqual({
-      status: "submitted_externally",
-      external_rfi_number: "RFI-042",
-      external_url: "https://example.com/rfis/42",
-      submitted_at: expect.any(String),
-    });
+      deriveWorkflowState({ issueStatus: "submitted", rfiStatus: "submitted_externally" })
+    ).toBe("submitted");
+    expect(deriveWorkflowState({ issueStatus: "resolved", rfiStatus: "closed" })).toBe(
+      "resolved"
+    );
   });
 
   test("trims workflow payload fields and preserves clearable nulls", () => {
     expect(
       buildIssueWorkflowPatch({
+        workflow_state: "approved",
         status: "draft_rfi",
-        rfi_status: "approved",
+        rfi_status: "needs_edit",
         trade: " doors ",
         discipline: "",
         due_date: "2026-06-15",
@@ -90,6 +90,7 @@ describe("RFI issue workflow", () => {
         draft_rfi: " Confirm door hardware set. ",
       })
     ).toEqual({
+      workflow_state: "approved",
       status: "draft_rfi",
       rfi_status: "approved",
       trade: "doors",

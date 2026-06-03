@@ -3,12 +3,15 @@ import { z } from "zod";
 import { requireProjectAccess } from "@/lib/api/auth";
 import {
   buildIssueWorkflowPatch,
-  isIssueTransitionAllowed,
+  deriveWorkflowState,
+  isWorkflowTransitionAllowed,
   issueStatuses,
+  issueWorkflowStates,
   rfiStatuses,
 } from "@/lib/issues/workflow";
 
 const issueUpdateSchema = z.object({
+  workflow_state: z.enum(issueWorkflowStates),
   status: z.enum(issueStatuses),
   rfi_status: z.enum(rfiStatuses),
   resolution_notes: z.string().max(4000),
@@ -37,7 +40,7 @@ export async function PATCH(
 
   const { data: existingIssue, error: existingError } = await supabase
     .from("issues")
-    .select("id, project_id, status")
+    .select("id, project_id, status, rfis(status)")
     .eq("id", issueId)
     .eq("project_id", projectId)
     .maybeSingle();
@@ -50,9 +53,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Issue not found" }, { status: 404 });
   }
 
-  if (!isIssueTransitionAllowed(existingIssue.status, parsed.data.status)) {
+  const existingRfis = Array.isArray(existingIssue.rfis)
+    ? existingIssue.rfis
+    : existingIssue.rfis
+      ? [existingIssue.rfis]
+      : [];
+  const currentWorkflowState = deriveWorkflowState({
+    issueStatus: existingIssue.status,
+    rfiStatus: existingRfis[0]?.status ?? null,
+  });
+
+  if (!isWorkflowTransitionAllowed(currentWorkflowState, parsed.data.workflow_state)) {
     return NextResponse.json(
-      { error: `Cannot move issue from ${existingIssue.status} to ${parsed.data.status}` },
+      {
+        error: `Cannot move issue from ${currentWorkflowState} to ${parsed.data.workflow_state}`,
+      },
       { status: 400 }
     );
   }

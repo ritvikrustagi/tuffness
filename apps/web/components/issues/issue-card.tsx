@@ -87,7 +87,6 @@ export function IssueCard({
       )}
 
       <IssueWorkflowForm
-        issue={issue}
         draft={draft}
         saving={saving}
         onChange={onDraftChange}

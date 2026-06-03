@@ -1,29 +1,23 @@
-import type { Issue } from "@/lib/types/database";
 import {
-  getAllowedIssueTransitions,
-  issueStatuses,
-  rfiStatuses,
+  getAllowedWorkflowTransitions,
   type IssueWorkflowDraft,
+  type IssueWorkflowState,
 } from "@/lib/issues/workflow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatStatus } from "@/components/issues/issue-display";
 
-function issueStatusOptions(issue: Issue) {
-  return issueStatuses.filter(
-    (status) => status === issue.status || getAllowedIssueTransitions(issue.status).includes(status)
-  );
+function workflowStateOptions(state: IssueWorkflowState) {
+  return [state, ...getAllowedWorkflowTransitions(state)];
 }
 
 export function IssueWorkflowForm({
-  issue,
   draft,
   saving,
   onChange,
   onSave,
   onCopy,
 }: {
-  issue: Issue;
   draft: IssueWorkflowDraft;
   saving: boolean;
   onChange: (patch: Partial<IssueWorkflowDraft>) => void;
@@ -33,35 +27,18 @@ export function IssueWorkflowForm({
   return (
     <>
       <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Issue status
+        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 md:col-span-2">
+          Workflow state
           <select
             className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-            value={draft.status}
+            value={draft.workflow_state}
             onChange={(event) =>
-              onChange({ status: event.target.value as IssueWorkflowDraft["status"] })
+              onChange({ workflow_state: event.target.value as IssueWorkflowState })
             }
           >
-            {issueStatusOptions(issue).map((status) => (
-              <option key={status} value={status}>
-                {formatStatus(status)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          RFI status
-          <select
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-            value={draft.rfi_status}
-            onChange={(event) =>
-              onChange({ rfi_status: event.target.value as IssueWorkflowDraft["rfi_status"] })
-            }
-          >
-            {rfiStatuses.map((status) => (
-              <option key={status} value={status}>
-                {formatStatus(status)}
+            {workflowStateOptions(draft.workflow_state).map((state) => (
+              <option key={state} value={state}>
+                {formatStatus(state)}
               </option>
             ))}
           </select>

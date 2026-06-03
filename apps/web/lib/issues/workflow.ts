@@ -19,10 +19,36 @@ export const rfiStatuses = [
   "closed",
 ] as const satisfies readonly RfiStatus[];
 
+export const issueWorkflowStates = [
+  "open",
+  "acknowledged",
+  "draft_rfi",
+  "needs_edit",
+  "approved",
+  "submitted",
+  "answered",
+  "resolved",
+  "dismissed",
+] as const;
+
+export type IssueWorkflowState = (typeof issueWorkflowStates)[number];
+
 const issueTransitions: Record<IssueStatus, IssueStatus[]> = {
   open: ["acknowledged", "draft_rfi", "resolved", "dismissed"],
   acknowledged: ["draft_rfi", "resolved", "dismissed"],
   draft_rfi: ["submitted", "resolved", "dismissed"],
+  submitted: ["answered", "resolved"],
+  answered: ["resolved"],
+  resolved: ["open"],
+  dismissed: ["open"],
+};
+
+const workflowTransitions: Record<IssueWorkflowState, IssueWorkflowState[]> = {
+  open: ["acknowledged", "draft_rfi", "resolved", "dismissed"],
+  acknowledged: ["draft_rfi", "resolved", "dismissed"],
+  draft_rfi: ["needs_edit", "approved", "submitted", "resolved", "dismissed"],
+  needs_edit: ["draft_rfi", "approved", "resolved", "dismissed"],
+  approved: ["needs_edit", "submitted", "resolved", "dismissed"],
   submitted: ["answered", "resolved"],
   answered: ["resolved"],
   resolved: ["open"],
@@ -37,7 +63,19 @@ export function isIssueTransitionAllowed(current: IssueStatus, next: IssueStatus
   return current === next || getAllowedIssueTransitions(current).includes(next);
 }
 
+export function getAllowedWorkflowTransitions(state: IssueWorkflowState): IssueWorkflowState[] {
+  return workflowTransitions[state] ?? [];
+}
+
+export function isWorkflowTransitionAllowed(
+  current: IssueWorkflowState,
+  next: IssueWorkflowState
+): boolean {
+  return current === next || getAllowedWorkflowTransitions(current).includes(next);
+}
+
 export type IssueWorkflowDraft = {
+  workflow_state: IssueWorkflowState;
   status: IssueStatus;
   rfi_status: RfiStatus;
   trade: string;
@@ -50,6 +88,50 @@ export type IssueWorkflowDraft = {
   resolution_notes: string;
   draft_rfi: string;
 };
+
+function workflowStateToStatuses(state: IssueWorkflowState): {
+  status: IssueStatus;
+  rfi_status: RfiStatus;
+} {
+  switch (state) {
+    case "open":
+      return { status: "open", rfi_status: "draft" };
+    case "acknowledged":
+      return { status: "acknowledged", rfi_status: "draft" };
+    case "draft_rfi":
+      return { status: "draft_rfi", rfi_status: "draft" };
+    case "needs_edit":
+      return { status: "draft_rfi", rfi_status: "needs_edit" };
+    case "approved":
+      return { status: "draft_rfi", rfi_status: "approved" };
+    case "submitted":
+      return { status: "submitted", rfi_status: "submitted_externally" };
+    case "answered":
+      return { status: "answered", rfi_status: "answered" };
+    case "resolved":
+      return { status: "resolved", rfi_status: "closed" };
+    case "dismissed":
+      return { status: "dismissed", rfi_status: "closed" };
+  }
+}
+
+export function deriveWorkflowState(input: {
+  issueStatus: IssueStatus;
+  rfiStatus: RfiStatus | null;
+}): IssueWorkflowState {
+  if (input.issueStatus === "draft_rfi") {
+    if (input.rfiStatus === "needs_edit") return "needs_edit";
+    if (input.rfiStatus === "approved") return "approved";
+    return "draft_rfi";
+  }
+
+  if (input.issueStatus === "submitted") return "submitted";
+  if (input.issueStatus === "answered") return "answered";
+  if (input.issueStatus === "resolved") return "resolved";
+  if (input.issueStatus === "dismissed") return "dismissed";
+  if (input.issueStatus === "acknowledged") return "acknowledged";
+  return "open";
+}
 
 type WorkflowIssueInput = {
   status: IssueStatus;
@@ -74,10 +156,16 @@ export function getInitialIssueWorkflowDraft(input: {
   rfi?: WorkflowRfiInput | null;
 }): IssueWorkflowDraft {
   const { issue, rfi } = input;
+  const workflow_state = deriveWorkflowState({
+    issueStatus: issue.status,
+    rfiStatus: rfi?.status ?? null,
+  });
+  const statuses = workflowStateToStatuses(workflow_state);
 
   return {
-    status: issue.status,
-    rfi_status: rfi?.status ?? "draft",
+    workflow_state,
+    status: statuses.status,
+    rfi_status: statuses.rfi_status,
     trade: issue.trade ?? "",
     discipline: issue.discipline ?? "",
     due_date: issue.due_date ?? "",
@@ -96,6 +184,7 @@ function cleanText(value: string): string | null {
 }
 
 export function buildIssueWorkflowPatch(input: IssueWorkflowDraft): {
+  workflow_state: IssueWorkflowState;
   status: IssueStatus;
   rfi_status: RfiStatus;
   trade: string | null;
@@ -108,9 +197,12 @@ export function buildIssueWorkflowPatch(input: IssueWorkflowDraft): {
   resolution_notes: string | null;
   draft_rfi: string | null;
 } {
+  const statuses = workflowStateToStatuses(input.workflow_state);
+
   return {
-    status: input.status,
-    rfi_status: input.rfi_status,
+    workflow_state: input.workflow_state,
+    status: statuses.status,
+    rfi_status: statuses.rfi_status,
     trade: cleanText(input.trade),
     discipline: cleanText(input.discipline),
     due_date: cleanText(input.due_date),
@@ -138,37 +230,4 @@ export function normalizeIssueEvidence(
     excerpt: item.quote,
     quote: item.quote,
   }));
-}
-
-export function buildDraftRfiPatch(input: {
-  status: RfiStatus;
-  external_rfi_number?: string | null;
-  external_url?: string | null;
-  response?: string | null;
-}) {
-  const patch: Record<string, string | null> = {
-    status: input.status,
-  };
-
-  if (input.external_rfi_number !== undefined) {
-    patch.external_rfi_number = input.external_rfi_number || null;
-  }
-
-  if (input.external_url !== undefined) {
-    patch.external_url = input.external_url || null;
-  }
-
-  if (input.response !== undefined) {
-    patch.response = input.response || null;
-  }
-
-  if (input.status === "submitted_externally") {
-    patch.submitted_at = new Date().toISOString();
-  }
-
-  if (input.status === "answered") {
-    patch.answered_at = new Date().toISOString();
-  }
-
-  return patch;
 }

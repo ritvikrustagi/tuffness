@@ -42,7 +42,11 @@ AS $$
 DECLARE
   v_issue public.issues%ROWTYPE;
   v_rfi_id UUID;
-  v_rfi_status public.rfi_status;
+  v_existing_rfi_status public.rfi_status;
+  v_current_workflow_state TEXT;
+  v_next_workflow_state TEXT;
+  v_next_issue_status public.issue_status;
+  v_next_rfi_status public.rfi_status;
   v_question TEXT;
 BEGIN
   SELECT *
@@ -56,12 +60,94 @@ BEGIN
     RAISE EXCEPTION 'Issue not found';
   END IF;
 
+  SELECT id, status
+  INTO v_rfi_id, v_existing_rfi_status
+  FROM public.rfis
+  WHERE issue_id = p_issue_id
+    AND project_id = p_project_id
+  ORDER BY created_at ASC
+  LIMIT 1
+  FOR UPDATE;
+
+  v_current_workflow_state := CASE v_issue.status
+    WHEN 'draft_rfi' THEN
+      CASE v_existing_rfi_status
+        WHEN 'needs_edit' THEN 'needs_edit'
+        WHEN 'approved' THEN 'approved'
+        ELSE 'draft_rfi'
+      END
+    WHEN 'submitted' THEN 'submitted'
+    WHEN 'answered' THEN 'answered'
+    WHEN 'resolved' THEN 'resolved'
+    WHEN 'dismissed' THEN 'dismissed'
+    WHEN 'acknowledged' THEN 'acknowledged'
+    ELSE 'open'
+  END;
+
+  v_next_workflow_state := COALESCE(NULLIF(p_patch->>'workflow_state', ''), v_current_workflow_state);
+
+  IF v_next_workflow_state NOT IN (
+    'open',
+    'acknowledged',
+    'draft_rfi',
+    'needs_edit',
+    'approved',
+    'submitted',
+    'answered',
+    'resolved',
+    'dismissed'
+  ) THEN
+    RAISE EXCEPTION 'Unknown workflow state %', v_next_workflow_state;
+  END IF;
+
+  IF NOT (
+    v_next_workflow_state = v_current_workflow_state
+    OR (v_current_workflow_state = 'open' AND v_next_workflow_state IN ('acknowledged', 'draft_rfi', 'resolved', 'dismissed'))
+    OR (v_current_workflow_state = 'acknowledged' AND v_next_workflow_state IN ('draft_rfi', 'resolved', 'dismissed'))
+    OR (v_current_workflow_state = 'draft_rfi' AND v_next_workflow_state IN ('needs_edit', 'approved', 'submitted', 'resolved', 'dismissed'))
+    OR (v_current_workflow_state = 'needs_edit' AND v_next_workflow_state IN ('draft_rfi', 'approved', 'resolved', 'dismissed'))
+    OR (v_current_workflow_state = 'approved' AND v_next_workflow_state IN ('needs_edit', 'submitted', 'resolved', 'dismissed'))
+    OR (v_current_workflow_state = 'submitted' AND v_next_workflow_state IN ('answered', 'resolved'))
+    OR (v_current_workflow_state = 'answered' AND v_next_workflow_state = 'resolved')
+    OR (v_current_workflow_state IN ('resolved', 'dismissed') AND v_next_workflow_state = 'open')
+  ) THEN
+    RAISE EXCEPTION 'Invalid workflow transition from % to %', v_current_workflow_state, v_next_workflow_state;
+  END IF;
+
+  v_next_issue_status := CASE v_next_workflow_state
+    WHEN 'open' THEN 'open'::public.issue_status
+    WHEN 'acknowledged' THEN 'acknowledged'::public.issue_status
+    WHEN 'draft_rfi' THEN 'draft_rfi'::public.issue_status
+    WHEN 'needs_edit' THEN 'draft_rfi'::public.issue_status
+    WHEN 'approved' THEN 'draft_rfi'::public.issue_status
+    WHEN 'submitted' THEN 'submitted'::public.issue_status
+    WHEN 'answered' THEN 'answered'::public.issue_status
+    WHEN 'resolved' THEN 'resolved'::public.issue_status
+    WHEN 'dismissed' THEN 'dismissed'::public.issue_status
+    ELSE 'open'::public.issue_status
+  END;
+
+  v_next_rfi_status := CASE v_next_workflow_state
+    WHEN 'needs_edit' THEN 'needs_edit'::public.rfi_status
+    WHEN 'approved' THEN 'approved'::public.rfi_status
+    WHEN 'submitted' THEN 'submitted_externally'::public.rfi_status
+    WHEN 'answered' THEN 'answered'::public.rfi_status
+    WHEN 'resolved' THEN 'closed'::public.rfi_status
+    WHEN 'dismissed' THEN 'closed'::public.rfi_status
+    ELSE 'draft'::public.rfi_status
+  END;
+
+  IF p_patch ? 'status' AND (p_patch->>'status')::public.issue_status <> v_next_issue_status THEN
+    RAISE EXCEPTION 'Issue status does not match workflow state %', v_next_workflow_state;
+  END IF;
+
+  IF p_patch ? 'rfi_status' AND (p_patch->>'rfi_status')::public.rfi_status <> v_next_rfi_status THEN
+    RAISE EXCEPTION 'RFI status does not match workflow state %', v_next_workflow_state;
+  END IF;
+
   UPDATE public.issues
   SET
-    status = CASE
-      WHEN p_patch ? 'status' THEN (p_patch->>'status')::public.issue_status
-      ELSE status
-    END,
+    status = v_next_issue_status,
     resolution_notes = CASE
       WHEN p_patch ? 'resolution_notes' THEN NULLIF(p_patch->>'resolution_notes', '')
       ELSE resolution_notes
@@ -89,25 +175,13 @@ BEGIN
   WHERE id = p_issue_id
     AND project_id = p_project_id;
 
-  IF p_patch ? 'rfi_status'
+  IF v_next_workflow_state IN ('draft_rfi', 'needs_edit', 'approved', 'submitted', 'answered', 'resolved', 'dismissed')
     OR p_patch ? 'external_rfi_number'
     OR p_patch ? 'external_url'
     OR p_patch ? 'response'
     OR p_patch ? 'draft_rfi'
+    OR v_rfi_id IS NOT NULL
   THEN
-    SELECT id
-    INTO v_rfi_id
-    FROM public.rfis
-    WHERE issue_id = p_issue_id
-      AND project_id = p_project_id
-    ORDER BY created_at ASC
-    LIMIT 1
-    FOR UPDATE;
-
-    v_rfi_status := COALESCE(
-      NULLIF(p_patch->>'rfi_status', '')::public.rfi_status,
-      'draft'::public.rfi_status
-    );
     v_question := COALESCE(
       NULLIF(p_patch->>'draft_rfi', ''),
       v_issue.draft_rfi,
@@ -135,21 +209,18 @@ BEGIN
         p_issue_id,
         LEFT(v_issue.summary, 200),
         v_question,
-        v_rfi_status,
+        v_next_rfi_status,
         NULLIF(p_patch->>'response', ''),
         NULLIF(p_patch->>'external_rfi_number', ''),
         NULLIF(p_patch->>'external_url', ''),
-        CASE WHEN v_rfi_status = 'submitted_externally' THEN NOW() ELSE NULL END,
-        CASE WHEN v_rfi_status = 'answered' THEN NOW() ELSE NULL END,
+        CASE WHEN v_next_rfi_status = 'submitted_externally' THEN NOW() ELSE NULL END,
+        CASE WHEN v_next_rfi_status = 'answered' THEN NOW() ELSE NULL END,
         p_user_id
       );
     ELSE
       UPDATE public.rfis
       SET
-        status = CASE
-          WHEN p_patch ? 'rfi_status' THEN (p_patch->>'rfi_status')::public.rfi_status
-          ELSE status
-        END,
+        status = v_next_rfi_status,
         question = CASE
           WHEN p_patch ? 'draft_rfi' THEN v_question
           ELSE question
@@ -167,12 +238,12 @@ BEGIN
           ELSE external_url
         END,
         submitted_at = CASE
-          WHEN p_patch ? 'rfi_status' AND (p_patch->>'rfi_status')::public.rfi_status = 'submitted_externally'
+          WHEN v_next_rfi_status = 'submitted_externally'
             THEN COALESCE(submitted_at, NOW())
           ELSE submitted_at
         END,
         answered_at = CASE
-          WHEN p_patch ? 'rfi_status' AND (p_patch->>'rfi_status')::public.rfi_status = 'answered'
+          WHEN v_next_rfi_status = 'answered'
             THEN COALESCE(answered_at, NOW())
           ELSE answered_at
         END
