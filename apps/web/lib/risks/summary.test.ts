@@ -118,6 +118,8 @@ describe("risk summaries", () => {
 
     expect(csv).toContain(`"'=Doors"`);
     expect(csv).toContain(`"'+Architect"`);
+    expect(buildRiskCsv([{ ...sampleRisks[0], trade: "-Doors" }])).toContain(`"'-Doors"`);
+    expect(buildRiskCsv([{ ...sampleRisks[0], trade: "@Doors" }])).toContain(`"'@Doors"`);
   });
 
   test("buildRiskCsv neutralizes formula-like values after leading whitespace", () => {
@@ -136,9 +138,25 @@ describe("risk summaries", () => {
         recommended_action: '\t=HYPERLINK("x","y")',
         evidence: [],
       },
+      {
+        id: "risk-crlf-formula",
+        summary: "\r=CMD",
+        status: "open",
+        risk_tier: "medium",
+        risk_category: "other",
+        cost_impact: "none",
+        schedule_impact: "low",
+        compliance_impact: "none",
+        required_artifact: "none",
+        confidence: 0.7,
+        recommended_action: "\n@foo",
+        evidence: [],
+      },
     ]);
 
     expect(csv).toContain(`"' =cmd"`);
     expect(csv).toContain(`"'\t=HYPERLINK(""x"",""y"")"`);
+    expect(csv).toContain(`"'\r=CMD"`);
+    expect(csv).toContain(`"'\n@foo"`);
   });
 });
