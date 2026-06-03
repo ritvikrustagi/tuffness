@@ -1,30 +1,70 @@
 import { describe, expect, test } from "vitest";
 import { calculateRiskScore, getRiskTier } from "./scoring";
+import { complianceImpacts, impactLevels, requiredArtifacts, riskCategories } from "./types";
 
 describe("risk scoring", () => {
+  test("uses planned risk vocabulary", () => {
+    expect(riskCategories).toEqual([
+      "drawing_spec_conflict",
+      "missing_information",
+      "coordination_conflict",
+      "submittal_requirement",
+      "possible_spec_deviation",
+      "owner_design_approval",
+      "schedule_constraint",
+      "cost_exposure",
+      "closeout_risk",
+      "other",
+    ]);
+    expect(impactLevels).toEqual(["none", "low", "medium", "high", "critical"]);
+    expect(complianceImpacts).toEqual([
+      "none",
+      "possible_noncompliance",
+      "spec_deviation",
+      "code_or_life_safety",
+      "submittal_required",
+      "owner_approval_required",
+      "inspection_or_testing_required",
+      "closeout_required",
+    ]);
+    expect(requiredArtifacts).toEqual([
+      "none",
+      "rfi",
+      "submittal",
+      "test_report",
+      "owner_approval",
+      "inspection",
+      "closeout_document",
+    ]);
+  });
+
   test("code_or_life_safety ranks critical even with no cost impact", () => {
-    const score = calculateRiskScore({
-      category: "code_or_life_safety",
-      schedule_impact: "minor",
+    const result = calculateRiskScore({
+      severity: "high",
+      schedule_impact: "low",
       cost_impact: "none",
-      compliance_impact: "code",
+      compliance_impact: "code_or_life_safety",
       confidence: 0.95,
+      evidence_count: 1,
+      blocks_work: false,
     });
 
-    expect(getRiskTier(score)).toBe("critical");
+    expect(result.risk_tier).toBe("critical");
   });
 
   test("weak confidence still keeps critical schedule blocker high but below critical", () => {
-    const score = calculateRiskScore({
-      category: "schedule",
+    const result = calculateRiskScore({
+      severity: "high",
       schedule_impact: "critical",
-      cost_impact: "minor",
+      cost_impact: "low",
       compliance_impact: "none",
       confidence: 0.25,
+      evidence_count: 1,
+      blocks_work: true,
     });
 
-    expect(getRiskTier(score)).toBe("high");
-    expect(score).toBeLessThan(90);
+    expect(result.risk_tier).toBe("high");
+    expect(result.risk_score).toBeLessThan(90);
   });
 
   test("getRiskTier maps thresholds", () => {

@@ -1,35 +1,40 @@
-import type { ComplianceImpact, ImpactLevel, RiskCategory, RiskTier } from "./types";
+import type { ComplianceImpact, ImpactLevel, RiskTier } from "./types";
+import type { IssueSeverity } from "../types/database";
 
-type RiskScoreInput = {
-  category?: RiskCategory | null;
-  schedule_impact?: ImpactLevel | null;
+export type RiskScoreInput = {
+  severity?: IssueSeverity | null;
   cost_impact?: ImpactLevel | null;
+  schedule_impact?: ImpactLevel | null;
   compliance_impact?: ComplianceImpact | null;
   confidence?: number | null;
+  evidence_count?: number | null;
+  blocks_work?: boolean | null;
 };
 
 const impactWeights: Record<ImpactLevel, number> = {
   none: 0,
-  minor: 10,
-  moderate: 24,
-  major: 38,
-  critical: 78,
+  low: 10,
+  medium: 22,
+  high: 36,
+  critical: 54,
 };
 
-const categoryWeights: Record<RiskCategory, number> = {
-  coordination: 8,
-  schedule: 14,
-  cost: 12,
-  compliance: 22,
-  code_or_life_safety: 68,
+const severityWeights: Record<IssueSeverity, number> = {
+  low: 8,
+  medium: 20,
+  high: 34,
+  critical: 52,
 };
 
 const complianceWeights: Record<ComplianceImpact, number> = {
   none: 0,
-  specification: 14,
-  code: 24,
-  permit: 20,
-  life_safety: 28,
+  possible_noncompliance: 16,
+  spec_deviation: 18,
+  code_or_life_safety: 58,
+  submittal_required: 12,
+  owner_approval_required: 12,
+  inspection_or_testing_required: 16,
+  closeout_required: 10,
 };
 
 function clampScore(score: number) {
@@ -38,15 +43,22 @@ function clampScore(score: number) {
 
 export function calculateRiskScore(risk: RiskScoreInput) {
   const confidence = Math.max(0, Math.min(1, risk.confidence ?? 0.7));
-  const scheduleImpact = impactWeights[risk.schedule_impact ?? "none"];
   const costImpact = impactWeights[risk.cost_impact ?? "none"];
-  const categoryImpact = categoryWeights[risk.category ?? "coordination"];
+  const scheduleImpact = impactWeights[risk.schedule_impact ?? "none"];
+  const severityImpact = severityWeights[risk.severity ?? "medium"];
   const complianceImpact = complianceWeights[risk.compliance_impact ?? "none"];
+  const evidenceImpact = Math.min(8, Math.max(0, risk.evidence_count ?? 0) * 2);
+  const blockerImpact = risk.blocks_work ? 8 : 0;
 
-  const rawScore = categoryImpact + scheduleImpact + costImpact + complianceImpact;
-  const confidenceAdjustedScore = rawScore * (0.65 + confidence * 0.35);
+  const rawScore =
+    severityImpact + costImpact + scheduleImpact + complianceImpact + evidenceImpact + blockerImpact;
+  const confidenceAdjustedScore = rawScore * (0.75 + confidence * 0.25);
+  const risk_score = clampScore(confidenceAdjustedScore);
 
-  return clampScore(confidenceAdjustedScore);
+  return {
+    risk_score,
+    risk_tier: getRiskTier(risk_score),
+  };
 }
 
 export function getRiskTier(score: number): RiskTier {

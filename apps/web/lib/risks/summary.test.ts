@@ -5,39 +5,60 @@ import type { RiskLike } from "./types";
 
 const sampleRisks = [
   {
-    id: "risk-1",
-    title: 'Door rating "gap"',
+    summary: 'Door rating "gap"',
     status: "open",
-    tier: "critical",
-    category: "code_or_life_safety",
-    compliance_impact: "code",
+    risk_tier: "critical",
+    risk_category: "drawing_spec_conflict",
+    cost_impact: "none",
+    schedule_impact: "low",
+    compliance_impact: "code_or_life_safety",
+    trade: "=Doors",
+    responsible_party: "+Architect",
+    spec_section: "08 11 00",
+    drawing_sheet: "A601",
     required_artifact: "rfi",
+    confidence: 0.95,
+    recommended_action: "Draft RFI for rated door clarification.",
     evidence: [
       {
         document_name: "A601",
         page_number: 12,
-        text: "Door rating not shown.",
+        quote: "Door rating not shown.",
       },
     ],
   },
   {
-    id: "risk-2",
-    title: "Submittal missing",
-    status: "under_review",
-    tier: "high",
-    category: "compliance",
-    compliance_impact: "specification",
+    summary: "Submittal missing",
+    status: "acknowledged",
+    risk_tier: "high",
+    risk_category: "submittal_requirement",
+    cost_impact: "low",
+    schedule_impact: "medium",
+    compliance_impact: "submittal_required",
+    trade: "Glazing",
+    responsible_party: "GC",
+    spec_section: "08 80 00",
+    drawing_sheet: null,
     required_artifact: "submittal",
+    confidence: 0.8,
+    recommended_action: "Request missing submittal.",
     evidence: [],
   },
   {
-    id: "risk-3",
-    title: "Closed coordination note",
+    summary: "Closed coordination note",
     status: "resolved",
-    tier: "medium",
-    category: "coordination",
+    risk_tier: "medium",
+    risk_category: "coordination_conflict",
+    cost_impact: "none",
+    schedule_impact: "none",
     compliance_impact: "none",
+    trade: null,
+    responsible_party: null,
+    spec_section: null,
+    drawing_sheet: null,
     required_artifact: "none",
+    confidence: 0.7,
+    recommended_action: null,
     evidence: [],
   },
 ] satisfies RiskLike[];
@@ -59,11 +80,18 @@ describe("risk summaries", () => {
     const csv = buildRiskCsv(sampleRisks);
 
     expect(csv).toContain(
-      '"id","title","status","tier","category","compliance_impact","required_artifact","evidence"'
+      '"Risk Tier","Summary","Risk Category","Cost Impact","Schedule Impact","Compliance Impact","Trade","Responsible Party","Spec Section","Drawing Sheet","Required Artifact","Confidence","Workflow State","Recommended Action","Evidence References"'
     );
     expect(csv).toContain(
-      '"risk-1","Door rating ""gap""","open","critical","code_or_life_safety","code","rfi"'
+      '"critical","Door rating ""gap""","drawing_spec_conflict","none","low","code_or_life_safety"'
     );
     expect(csv).toContain("A601 p.12: Door rating not shown.");
+  });
+
+  test("buildRiskCsv neutralizes formula-like values before quoting", () => {
+    const csv = buildRiskCsv(sampleRisks);
+
+    expect(csv).toContain(`"'=Doors"`);
+    expect(csv).toContain(`"'+Architect"`);
   });
 });

@@ -1,37 +1,54 @@
 import type { RiskEvidence, RiskLike } from "./types";
 
 const riskCsvHeaders = [
-  "id",
-  "title",
-  "status",
-  "tier",
-  "category",
-  "compliance_impact",
-  "required_artifact",
-  "evidence",
+  "Risk Tier",
+  "Summary",
+  "Risk Category",
+  "Cost Impact",
+  "Schedule Impact",
+  "Compliance Impact",
+  "Trade",
+  "Responsible Party",
+  "Spec Section",
+  "Drawing Sheet",
+  "Required Artifact",
+  "Confidence",
+  "Workflow State",
+  "Recommended Action",
+  "Evidence References",
 ] as const;
 
 function quoteCsvCell(value: string | number | null | undefined) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const cell = String(value ?? "");
+  const neutralizedCell = /^[=+\-@]/.test(cell) ? `'${cell}` : cell;
+
+  return `"${neutralizedCell.replaceAll('"', '""')}"`;
 }
 
 function formatEvidence(evidence: RiskEvidence) {
   const documentName = evidence.document_name ?? "Unknown document";
   const pageNumber = evidence.page_number ? ` p.${evidence.page_number}` : "";
-  const text = evidence.text ?? evidence.quote ?? evidence.excerpt ?? "";
+  const text = evidence.quote ?? evidence.excerpt ?? "";
 
   return `${documentName}${pageNumber}: ${text}`.trim();
 }
 
 export function buildRiskCsv(risks: RiskLike[]) {
   const rows = risks.map((risk) => [
-    risk.id,
-    risk.title ?? risk.summary,
-    risk.status,
-    risk.tier,
-    risk.category,
+    risk.risk_tier,
+    risk.summary,
+    risk.risk_category,
+    risk.cost_impact,
+    risk.schedule_impact,
     risk.compliance_impact,
+    risk.trade,
+    risk.responsible_party,
+    risk.spec_section,
+    risk.drawing_sheet,
     risk.required_artifact,
+    risk.confidence,
+    risk.status,
+    risk.recommended_action,
     (risk.evidence ?? []).map(formatEvidence).join("\n"),
   ]);
 
