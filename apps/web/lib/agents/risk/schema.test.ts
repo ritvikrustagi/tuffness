@@ -68,4 +68,12 @@ describe("riskAgentOutputSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  test("rejects more than five risks per topic", () => {
+    const result = riskAgentOutputSchema.safeParse({
+      risks: Array.from({ length: 6 }, () => evidenceBackedFinding),
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

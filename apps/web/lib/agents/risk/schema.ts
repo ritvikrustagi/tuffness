@@ -4,7 +4,7 @@ import {
   impactLevels,
   requiredArtifacts,
   riskCategories,
-} from "../../risks/types";
+} from "@/lib/risks/types";
 
 export const riskEvidenceSchema = z.object({
   document_id: z.string().uuid(),
@@ -21,10 +21,10 @@ export const riskFindingSchema = z.object({
   compliance_impact: z.enum(complianceImpacts),
   required_artifact: z.enum(requiredArtifacts),
   responsible_party: z.string().min(1).max(200).optional(),
-  responsible_trade: z.string().min(1).max(100).optional(),
-  spec_section: z.string().min(1).max(100).optional(),
-  drawing_sheet: z.string().min(1).max(100).optional(),
-  blocked_activity: z.string().min(1).max(400).optional(),
+  responsible_trade: z.string().min(1).max(120).optional(),
+  spec_section: z.string().min(1).max(80).optional(),
+  drawing_sheet: z.string().min(1).max(80).optional(),
+  blocked_activity: z.string().min(1).max(300).optional(),
   summary: z.string().min(1).max(500),
   description: z.string().min(1).max(2500),
   evidence: z.array(riskEvidenceSchema).min(1).max(10),
@@ -35,7 +35,7 @@ export const riskFindingSchema = z.object({
 });
 
 export const riskAgentOutputSchema = z.object({
-  risks: z.array(riskFindingSchema).max(10),
+  risks: z.array(riskFindingSchema).max(5),
 });
 
 export type RiskAgentOutput = z.infer<typeof riskAgentOutputSchema>;
