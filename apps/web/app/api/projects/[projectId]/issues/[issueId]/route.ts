@@ -4,6 +4,7 @@ import { requireProjectAccess } from "@/lib/api/auth";
 import {
   buildIssueWorkflowRpcPatch,
   deriveWorkflowState,
+  type IssueWorkflowState,
   isWorkflowTransitionAllowed,
   issueStatuses,
   issueWorkflowStates,
@@ -12,7 +13,7 @@ import {
 import { riskMetadataPatchSchema, type RiskMetadataPatch } from "@/lib/risks/validation";
 
 const workflowUpdateSchema = z.object({
-  workflow_state: z.enum(issueWorkflowStates),
+  workflow_state: z.enum(issueWorkflowStates).optional(),
   status: z.enum(issueStatuses).optional(),
   rfi_status: z.enum(rfiStatuses).optional(),
   subject: z.string().max(200).nullable().optional(),
@@ -30,7 +31,12 @@ const workflowUpdateSchema = z.object({
 
 const issueUpdateSchema = workflowUpdateSchema.extend(riskMetadataPatchSchema.shape);
 
+type WorkflowPatch = z.infer<typeof workflowUpdateSchema>;
+
 const hasRiskMetadataPatch = (patch: RiskMetadataPatch) =>
+  Object.values(patch).some((value) => value !== undefined);
+
+const hasWorkflowPatch = (patch: WorkflowPatch) =>
   Object.values(patch).some((value) => value !== undefined);
 
 export async function PATCH(
@@ -44,6 +50,15 @@ export async function PATCH(
   const parsed = issueUpdateSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
+  }
+
+  const riskPatch = riskMetadataPatchSchema.parse(parsed.data);
+  const workflowPatch = workflowUpdateSchema.parse(parsed.data);
+  const hasRiskPatch = hasRiskMetadataPatch(riskPatch);
+  const hasWorkflowFields = hasWorkflowPatch(workflowPatch);
+
+  if (!hasRiskPatch && !hasWorkflowFields) {
+    return NextResponse.json({ error: "No issue fields provided" }, { status: 400 });
   }
 
   const { data: existingIssue, error: existingError } = await supabase
@@ -71,28 +86,19 @@ export async function PATCH(
     rfiStatus: existingRfis[0]?.status ?? null,
   });
 
-  if (!isWorkflowTransitionAllowed(currentWorkflowState, parsed.data.workflow_state)) {
+  if (
+    workflowPatch.workflow_state &&
+    !isWorkflowTransitionAllowed(currentWorkflowState, workflowPatch.workflow_state)
+  ) {
     return NextResponse.json(
       {
-        error: `Cannot move issue from ${currentWorkflowState} to ${parsed.data.workflow_state}`,
+        error: `Cannot move issue from ${currentWorkflowState} to ${workflowPatch.workflow_state}`,
       },
       { status: 400 }
     );
   }
 
-  const { error: saveError } = await supabase.rpc("save_issue_workflow", {
-    p_project_id: projectId,
-    p_issue_id: issueId,
-    p_user_id: user.id,
-    p_patch: buildIssueWorkflowRpcPatch(parsed.data),
-  });
-
-  if (saveError) {
-    return NextResponse.json({ error: saveError.message }, { status: 500 });
-  }
-
-  const riskPatch = riskMetadataPatchSchema.parse(parsed.data);
-  if (hasRiskMetadataPatch(riskPatch)) {
+  if (hasRiskPatch) {
     const { error: riskUpdateError } = await supabase
       .from("issues")
       .update({
@@ -105,6 +111,23 @@ export async function PATCH(
 
     if (riskUpdateError) {
       return NextResponse.json({ error: riskUpdateError.message }, { status: 500 });
+    }
+  }
+
+  if (hasWorkflowFields) {
+    const workflowState: IssueWorkflowState = workflowPatch.workflow_state ?? currentWorkflowState;
+    const { error: saveError } = await supabase.rpc("save_issue_workflow", {
+      p_project_id: projectId,
+      p_issue_id: issueId,
+      p_user_id: user.id,
+      p_patch: buildIssueWorkflowRpcPatch({
+        ...workflowPatch,
+        workflow_state: workflowState,
+      }),
+    });
+
+    if (saveError) {
+      return NextResponse.json({ error: saveError.message }, { status: 500 });
     }
   }
 

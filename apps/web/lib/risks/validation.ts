@@ -12,9 +12,15 @@ const emptyStringToNull = (value: unknown) => (value === "" ? null : value);
 const nullableString = (max: number) =>
   z.preprocess(emptyStringToNull, z.string().max(max).nullable().optional());
 
+const nullableRiskScore = z.preprocess((value) => {
+  if (value === "") return null;
+  if (typeof value === "string") return Number(value);
+  return value;
+}, z.number().int().min(0).max(100).nullable().optional());
+
 export const riskMetadataPatchSchema = z.object({
   risk_category: z.preprocess(emptyStringToNull, z.enum(riskCategories).nullable().optional()),
-  risk_score: z.number().int().min(0).max(100).nullable().optional(),
+  risk_score: nullableRiskScore,
   risk_tier: z.preprocess(emptyStringToNull, z.enum(riskTiers).nullable().optional()),
   cost_impact: z.preprocess(emptyStringToNull, z.enum(impactLevels).nullable().optional()),
   schedule_impact: z.preprocess(emptyStringToNull, z.enum(impactLevels).nullable().optional()),
