@@ -1,4 +1,6 @@
 import { summarizeIssueWorkflows } from "../issues/workflow";
+import { summarizeRisks, type RiskSummary } from "../risks/summary";
+import type { RiskLike } from "../risks/types";
 import type { createClient } from "../supabase/server";
 import type {
   AgentRun,
@@ -28,9 +30,20 @@ export type SubmittalReviewSummary = {
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
+type ProjectDashboardIssue = {
+  id?: string;
+  status: IssueStatus;
+  rfis?: Array<{ status: RfiStatus }> | null;
+  summary?: string | null;
+  risk_tier?: RiskLike["risk_tier"];
+  risk_score?: number | null;
+  compliance_impact?: RiskLike["compliance_impact"];
+  required_artifact?: RiskLike["required_artifact"];
+};
+
 export type ProjectDashboardInput<
   TDocument extends { status: DocumentStatus },
-  TIssue extends { status: IssueStatus; rfis?: Array<{ status: RfiStatus }> | null },
+  TIssue extends ProjectDashboardIssue,
   TSubmittal extends { review_status: SubmittalReviewStatus },
   TAgentRun,
 > = {
@@ -43,16 +56,18 @@ export type ProjectDashboardInput<
 
 export type ProjectDashboardData<
   TDocument extends { status: DocumentStatus } = Document,
-  TIssue extends { status: IssueStatus; rfis?: Array<{ status: RfiStatus }> | null } = Issue,
+  TIssue extends ProjectDashboardIssue = Issue,
   TSubmittal extends { review_status: SubmittalReviewStatus } = Submittal,
   TAgentRun = AgentRun,
 > = ProjectDashboardInput<TDocument, TIssue, TSubmittal, TAgentRun> & {
   documentSummary: DocumentReadinessSummary;
   issueSummary: ReturnType<typeof summarizeIssueWorkflows>;
   submittalSummary: SubmittalReviewSummary;
+  riskSummary: RiskSummary;
   recentDocuments: TDocument[];
   recentIssues: TIssue[];
   recentSubmittals: TSubmittal[];
+  topRisks: TIssue[];
 };
 
 export function summarizeDocuments(
@@ -87,7 +102,7 @@ export function summarizeSubmittals(
 
 export function buildProjectDashboard<
   TDocument extends { status: DocumentStatus },
-  TIssue extends { status: IssueStatus; rfis?: Array<{ status: RfiStatus }> | null },
+  TIssue extends ProjectDashboardIssue,
   TSubmittal extends { review_status: SubmittalReviewStatus },
   TAgentRun,
 >({
@@ -102,6 +117,8 @@ export function buildProjectDashboard<
   TSubmittal,
   TAgentRun
 > {
+  const risks = issues.filter((issue) => issue.risk_tier);
+
   return {
     projectId,
     documents,
@@ -111,9 +128,11 @@ export function buildProjectDashboard<
     documentSummary: summarizeDocuments(documents),
     issueSummary: summarizeIssueWorkflows(issues),
     submittalSummary: summarizeSubmittals(submittals),
+    riskSummary: summarizeRisks(risks),
     recentDocuments: documents.slice(0, 3),
     recentIssues: issues.slice(0, 3),
     recentSubmittals: submittals.slice(0, 3),
+    topRisks: [...risks].sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0)).slice(0, 3),
   };
 }
 

@@ -13,6 +13,14 @@ function StatCard({ label, value }: { label: string; value: number }) {
   );
 }
 
+function formatRiskLabel(value: string | null | undefined) {
+  return value ? value.replaceAll("_", " ") : "Unspecified";
+}
+
+function formatRiskScore(value: number | null | undefined) {
+  return typeof value === "number" ? value : "Unscored";
+}
+
 function ActivityItem({
   title,
   detail,
@@ -64,10 +72,12 @@ export function ProjectOverview({ dashboard }: { dashboard: ProjectDashboardData
     agentRuns,
     documentSummary,
     issueSummary,
+    riskSummary,
     submittalSummary,
     recentDocuments,
     recentIssues,
     recentSubmittals,
+    topRisks,
   } = dashboard;
 
   return (
@@ -131,6 +141,19 @@ export function ProjectOverview({ dashboard }: { dashboard: ProjectDashboardData
 
       <section>
         <h3 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          Risk exposure
+        </h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <StatCard label="Open risks" value={riskSummary.open} />
+          <StatCard label="Critical/high" value={riskSummary.critical_or_high} />
+          <StatCard label="Compliance" value={riskSummary.compliance_exposure} />
+          <StatCard label="Draft RFIs" value={riskSummary.draft_rfis_needed} />
+          <StatCard label="Awaiting review" value={riskSummary.awaiting_review} />
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           Submittal review
         </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -142,7 +165,7 @@ export function ProjectOverview({ dashboard }: { dashboard: ProjectDashboardData
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className={`grid gap-4 ${topRisks.length > 0 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         <ActivityList
           title="Recent documents"
           emptyText="No documents uploaded yet."
@@ -184,6 +207,31 @@ export function ProjectOverview({ dashboard }: { dashboard: ProjectDashboardData
             />
           )}
         />
+
+        {topRisks.length > 0 && (
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Top risks
+            </h3>
+            <div className="mt-3 space-y-2">
+              {topRisks.map((risk) => (
+                <Link
+                  key={risk.id}
+                  href={`/projects/${projectId}/risks`}
+                  className="block rounded-lg border border-zinc-200 p-3 text-sm transition hover:border-orange-300 hover:text-orange-700 dark:border-zinc-800 dark:hover:border-orange-700 dark:hover:text-orange-400"
+                >
+                  <div className="flex items-center justify-between gap-3 text-xs font-medium uppercase text-zinc-500">
+                    <span>{formatRiskLabel(risk.risk_tier)}</span>
+                    <span>Score {formatRiskScore(risk.risk_score)}</span>
+                  </div>
+                  <p className="mt-2 font-medium text-zinc-900 dark:text-zinc-100">
+                    {risk.summary}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
       </section>
 
       {agentRuns.length > 0 && (

@@ -85,4 +85,48 @@ describe("project dashboard summaries", () => {
       "sub-3",
     ]);
   });
+
+  test("includes risk summary and top risks in project dashboard data", () => {
+    const dashboard = buildProjectDashboard({
+      projectId: "project-1",
+      documents: [],
+      issues: [
+        {
+          id: "risk-1",
+          summary: "Life safety detail conflict",
+          severity: "high",
+          status: "open",
+          rfis: [],
+          risk_tier: "critical",
+          risk_score: 92,
+          compliance_impact: "code_or_life_safety",
+          required_artifact: "rfi",
+        },
+        {
+          id: "risk-2",
+          summary: "Submittal missing for substitution",
+          severity: "medium",
+          status: "open",
+          rfis: [],
+          risk_tier: "high",
+          risk_score: 70,
+          compliance_impact: "submittal_required",
+          required_artifact: "submittal",
+        },
+        {
+          id: "issue-1",
+          summary: "General coordination item",
+          severity: "low",
+          status: "open",
+          rfis: [],
+        },
+      ],
+      submittals: [],
+      agentRuns: [],
+    });
+
+    expect(dashboard.riskSummary.open).toBe(2);
+    expect(dashboard.riskSummary.compliance_exposure).toBe(2);
+    expect(dashboard.topRisks.map((risk) => risk.id)).toEqual(["risk-1", "risk-2"]);
+  });
 });
