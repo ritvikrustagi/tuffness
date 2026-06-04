@@ -1,7 +1,13 @@
+"use client";
+
+import { Clipboard } from "lucide-react";
+import { useState } from "react";
 import type { Issue } from "@/lib/types/database";
 import { SourceViewer } from "@/components/documents/source-viewer";
 import { evidenceText, formatStatus } from "@/components/issues/issue-display";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { buildComplianceItemText, isComplianceRisk } from "@/lib/risks/compliance";
 
 const tierColors: Record<NonNullable<Issue["risk_tier"]>, string> = {
   low: "bg-zinc-100 text-zinc-700",
@@ -28,6 +34,14 @@ function riskOwner(issue: Issue) {
 
 export function RiskCard({ projectId, risk }: { projectId: string; risk: Issue }) {
   const evidence = risk.evidence ?? [];
+  const [copied, setCopied] = useState(false);
+  const complianceRisk = isComplianceRisk(risk);
+
+  async function copyCompliancePacket() {
+    await navigator.clipboard.writeText(buildComplianceItemText(risk));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
     <Card>
@@ -77,10 +91,46 @@ export function RiskCard({ projectId, risk }: { projectId: string; risk: Issue }
         ))}
       </dl>
 
+      {complianceRisk && (
+        <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["Required artifact", formatLabel(risk.required_artifact)],
+            ["Spec section", risk.spec_section ?? "Not specified"],
+            ["Drawing sheet", risk.drawing_sheet ?? "Not specified"],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                {label}
+              </dt>
+              <dd className="mt-1 break-words text-sm capitalize text-zinc-800 dark:text-zinc-200">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
       {risk.recommended_action && (
         <p className="mt-4 break-words text-sm font-medium text-zinc-800 dark:text-zinc-200">
           Recommended action: {risk.recommended_action}
         </p>
+      )}
+
+      {complianceRisk && (
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={copyCompliancePacket}
+            className="gap-2"
+          >
+            <Clipboard className="h-4 w-4" />
+            {copied ? "Copied" : "Copy compliance packet"}
+          </Button>
+        </div>
       )}
 
       {evidence.length > 0 && (

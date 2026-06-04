@@ -22,4 +22,13 @@ describe("risk analysis prompt", () => {
       `required_artifact must be one of: ${requiredArtifacts.join(", ")}.`
     );
   });
+
+  test("renders compliance-focused instructions in compliance mode", () => {
+    const prompt = buildRiskSystemPrompt("Doors", "compliance_register_scan");
+
+    expect(prompt).toContain("AI compliance register scan");
+    expect(prompt).toContain("submittal requirements");
+    expect(prompt).toContain("inspection, testing, report, certificate, commissioning");
+    expect(prompt).toContain("owner, architect, engineer, AHJ, or design-team approval");
+  });
 });

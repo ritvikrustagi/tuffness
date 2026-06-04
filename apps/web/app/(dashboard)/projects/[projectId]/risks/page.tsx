@@ -35,7 +35,10 @@ export default async function ProjectRisksPage({
             follow-up work.
           </p>
         </div>
-        <RiskScanButton projectId={projectId} />
+        <div className="flex flex-wrap gap-3">
+          <RiskScanButton projectId={projectId} />
+          <RiskScanButton projectId={projectId} mode="compliance" />
+        </div>
       </div>
 
       <RiskRegister projectId={projectId} risks={typedRisks} />

@@ -1,12 +1,63 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export function RiskScanButton({ projectId }: { projectId: string }) {
+type ScanMode = "risk" | "compliance";
+
+const scanConfig: Record<
+  ScanMode,
+  {
+    endpoint: string;
+    idleLabel: string;
+    loadingLabel: string;
+    startingLabel: string;
+    runningLabel: string;
+    completeLabel: (risksCreated: number, rfisCreated: number) => string;
+    errorLabel: string;
+    Icon: typeof AlertTriangle;
+  }
+> = {
+  risk: {
+    endpoint: "risk-scan",
+    idleLabel: "Scan Risks",
+    loadingLabel: "Scanning...",
+    startingLabel: "Starting risk scan...",
+    runningLabel: "Scanning project documents for risks...",
+    completeLabel: (risksCreated, rfisCreated) =>
+      risksCreated
+        ? `Risk scan complete. ${risksCreated} risk(s) found, ${rfisCreated} draft RFI(s) created.`
+        : "Risk scan complete. No new risks detected.",
+    errorLabel: "Risk scan failed",
+    Icon: AlertTriangle,
+  },
+  compliance: {
+    endpoint: "compliance-scan",
+    idleLabel: "Scan Compliance",
+    loadingLabel: "Scanning...",
+    startingLabel: "Starting compliance scan...",
+    runningLabel: "Scanning project documents for compliance items...",
+    completeLabel: (risksCreated, rfisCreated) =>
+      risksCreated
+        ? `Compliance scan complete. ${risksCreated} item(s) found, ${rfisCreated} draft RFI(s) created.`
+        : "Compliance scan complete. No new compliance items detected.",
+    errorLabel: "Compliance scan failed",
+    Icon: ShieldCheck,
+  },
+};
+
+export function RiskScanButton({
+  projectId,
+  mode = "risk",
+}: {
+  projectId: string;
+  mode?: ScanMode;
+}) {
   const router = useRouter();
+  const config = scanConfig[mode];
+  const Icon = config.Icon;
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +78,7 @@ export function RiskScanButton({ projectId }: { projectId: string }) {
       if (!run) continue;
 
       if (run.status === "running") {
-        setStatus("Scanning project documents for risks...");
+        setStatus(config.runningLabel);
         continue;
       }
 
@@ -35,11 +86,7 @@ export function RiskScanButton({ projectId }: { projectId: string }) {
         const summary = run.output_summary as { risks_created?: number; rfis_created?: number };
         const risksCreated = summary.risks_created ?? 0;
         const rfisCreated = summary.rfis_created ?? 0;
-        setStatus(
-          risksCreated
-            ? `Risk scan complete. ${risksCreated} risk(s) found, ${rfisCreated} draft RFI(s) created.`
-            : "Risk scan complete. No new risks detected."
-        );
+        setStatus(config.completeLabel(risksCreated, rfisCreated));
         router.refresh();
         setLoading(false);
         return;
@@ -50,16 +97,16 @@ export function RiskScanButton({ projectId }: { projectId: string }) {
       }
     }
 
-    throw new Error("Risk scan timed out while waiting for completion");
+    throw new Error(`${config.errorLabel} while waiting for completion`);
   }
 
   async function startScan() {
     setLoading(true);
     setError(null);
-    setStatus("Starting risk scan...");
+    setStatus(config.startingLabel);
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/agents/risk-scan`, {
+      const res = await fetch(`/api/projects/${projectId}/agents/${config.endpoint}`, {
         method: "POST",
       });
       const data = await res.json();
@@ -70,7 +117,7 @@ export function RiskScanButton({ projectId }: { projectId: string }) {
 
       await pollRun(data.agent_run_id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Risk scan failed");
+      setError(err instanceof Error ? err.message : config.errorLabel);
       setStatus(null);
     } finally {
       setLoading(false);
@@ -80,8 +127,8 @@ export function RiskScanButton({ projectId }: { projectId: string }) {
   return (
     <div>
       <Button onClick={startScan} disabled={loading} className="gap-2">
-        <AlertTriangle className="h-4 w-4" />
-        {loading ? "Scanning..." : "Scan Risks"}
+        <Icon className="h-4 w-4" />
+        {loading ? config.loadingLabel : config.idleLabel}
       </Button>
       {status && !error && (
         <p

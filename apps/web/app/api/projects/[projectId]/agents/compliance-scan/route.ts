@@ -8,7 +8,7 @@ export async function POST(
 
   return startProjectRiskScan({
     projectId,
-    mode: "risk_register_scan",
-    label: "risk",
+    mode: "compliance_register_scan",
+    label: "compliance",
   });
 }

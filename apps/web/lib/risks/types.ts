@@ -62,6 +62,7 @@ export type RiskLike = {
   compliance_impact?: ComplianceImpact | null;
   trade?: string | null;
   responsible_party?: string | null;
+  responsible_trade?: string | null;
   spec_section?: string | null;
   drawing_sheet?: string | null;
   required_artifact?: RequiredArtifact | null;

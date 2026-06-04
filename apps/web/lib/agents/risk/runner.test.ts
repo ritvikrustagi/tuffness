@@ -74,6 +74,7 @@ describe("risk scan runner helpers", () => {
 
     expect(
       buildRiskRunSummary({
+        mode: "compliance_register_scan",
         risksCreated: 0,
         rfisCreated: 0,
         topicsAnalyzed: 1,
@@ -86,6 +87,7 @@ describe("risk scan runner helpers", () => {
       rfis_created: 0,
       topics_analyzed: 1,
       skipped_topics: 0,
+      mode: "compliance_register_scan",
       errors: ["Doors: unsupported evidence for Door rating mismatch"],
       code: "validation_failed",
     });
@@ -168,6 +170,7 @@ describe("risk scan runner helpers", () => {
     );
 
     expect(patch?.output_summary).toEqual({
+      mode: "risk_register_scan",
       risks_created: 0,
       rfis_created: 0,
       topics_analyzed: 0,

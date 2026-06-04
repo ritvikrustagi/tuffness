@@ -18,6 +18,21 @@ const riskCsvHeaders = [
   "Evidence References",
 ] as const;
 
+const complianceCsvHeaders = [
+  "Priority",
+  "Summary",
+  "Compliance Impact",
+  "Required Artifact",
+  "Spec Section",
+  "Drawing Sheet",
+  "Responsible Party",
+  "Responsible Trade",
+  "Confidence",
+  "Workflow State",
+  "Recommended Action",
+  "Evidence References",
+] as const;
+
 function quoteCsvCell(value: string | number | null | undefined) {
   const cell = String(value ?? "");
   const neutralizedCell = /^[\t\r\n ]*[=+\-@]/.test(cell) ? `'${cell}` : cell;
@@ -53,6 +68,27 @@ export function buildRiskCsv(risks: RiskLike[]) {
   ]);
 
   return [riskCsvHeaders, ...rows]
+    .map((row) => row.map((cell) => quoteCsvCell(cell)).join(","))
+    .join("\n");
+}
+
+export function buildComplianceCsv(risks: RiskLike[]) {
+  const rows = risks.map((risk) => [
+    risk.risk_tier,
+    risk.summary,
+    risk.compliance_impact,
+    risk.required_artifact,
+    risk.spec_section,
+    risk.drawing_sheet,
+    risk.responsible_party,
+    risk.responsible_trade ?? risk.trade,
+    risk.confidence,
+    risk.status,
+    risk.recommended_action,
+    (risk.evidence ?? []).map(formatEvidence).join("\n"),
+  ]);
+
+  return [complianceCsvHeaders, ...rows]
     .map((row) => row.map((cell) => quoteCsvCell(cell)).join(","))
     .join("\n");
 }

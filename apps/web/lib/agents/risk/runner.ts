@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { RiskAnalysisError, analyzeRiskTopicGroup } from "@/lib/agents/risk/analyze";
+import {
+  RiskAnalysisError,
+  analyzeRiskTopicGroup,
+  type RiskScanMode,
+} from "@/lib/agents/risk/analyze";
 import type { RiskFinding } from "@/lib/agents/risk/schema";
 import {
   createRiskDedupeKey,
@@ -17,6 +21,7 @@ export { createRiskDedupeKey };
 export type { RiskFailureCode, RiskTopicError };
 
 export interface RiskRunSummary {
+  mode: RiskScanMode;
   risks_created: number;
   rfis_created: number;
   topics_analyzed: number;
@@ -79,6 +84,7 @@ function finalFailureCode(errors: RiskTopicError[]): RiskFailureCode {
 }
 
 export function buildRiskRunSummary(params: {
+  mode?: RiskScanMode;
   risksCreated: number;
   rfisCreated: number;
   topicsAnalyzed: number;
@@ -87,6 +93,7 @@ export function buildRiskRunSummary(params: {
   code?: RiskScanError["code"];
 }): RiskRunSummary {
   return {
+    mode: params.mode ?? "risk_register_scan",
     risks_created: params.risksCreated,
     rfis_created: params.rfisCreated,
     topics_analyzed: params.topicsAnalyzed,
@@ -159,8 +166,16 @@ export async function runRiskScan(params: {
   organizationId: string;
   agentRunId: string;
   userId: string;
+  mode?: RiskScanMode;
 }): Promise<RiskScanResult> {
-  const { supabase, projectId, organizationId, agentRunId, userId } = params;
+  const {
+    supabase,
+    projectId,
+    organizationId,
+    agentRunId,
+    userId,
+    mode = "risk_register_scan",
+  } = params;
 
   await updateAgentRun(supabase, agentRunId, {
     status: "running",
@@ -204,7 +219,7 @@ export async function runRiskScan(params: {
     topicsAnalyzed += 1;
 
     try {
-      const output = await analyzeRiskTopicGroup(group.topic, group.chunks);
+      const output = await analyzeRiskTopicGroup(group.topic, group.chunks, mode);
 
       if (output.risks.length === 0) {
         skippedTopics += 1;
@@ -258,6 +273,7 @@ export async function runRiskScan(params: {
       skippedTopics,
       errors,
       code,
+      mode,
     });
     throw new RiskScanError(
       summary.errors[0] ?? "All topic analyses failed",
@@ -272,6 +288,7 @@ export async function runRiskScan(params: {
     topicsAnalyzed,
     skippedTopics,
     errors,
+    mode,
   });
 
   await updateAgentRun(supabase, agentRunId, {
@@ -295,6 +312,7 @@ export async function failRiskAgentRun(
   error: RiskScanError
 ) {
   const outputSummary: RiskRunSummary = {
+    mode: error.summary?.mode ?? "risk_register_scan",
     risks_created: 0,
     rfis_created: 0,
     topics_analyzed: 0,

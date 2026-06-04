@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildRiskCsv } from "./export";
+import { buildComplianceCsv, buildRiskCsv } from "./export";
 import { summarizeRisks } from "./summary";
 import type { RiskLike } from "./types";
 
@@ -159,5 +159,16 @@ describe("risk summaries", () => {
     expect(csv).toContain(`"'\t=HYPERLINK(""x"",""y"")"`);
     expect(csv).toContain(`"'\r=CMD"`);
     expect(csv).toContain(`"'\n@foo"`);
+  });
+
+  test("buildComplianceCsv emits compliance-focused columns", () => {
+    const csv = buildComplianceCsv(sampleRisks);
+
+    expect(csv).toContain(
+      '"Priority","Summary","Compliance Impact","Required Artifact","Spec Section","Drawing Sheet","Responsible Party","Responsible Trade","Confidence","Workflow State","Recommended Action","Evidence References"'
+    );
+    expect(csv).toContain('"critical","Door rating ""gap""","code_or_life_safety","rfi"');
+    expect(csv).toContain(`"'+Architect"`);
+    expect(csv).toContain("A601 p.12: Door rating not shown.");
   });
 });
