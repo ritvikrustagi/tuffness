@@ -20,6 +20,15 @@ export async function POST(
     return NextResponse.json({ error: "OpenAI is not configured" }, { status: 500 });
   }
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json(
+      { error: "Server misconfigured: missing SUPABASE_SERVICE_ROLE_KEY" },
+      { status: 500 }
+    );
+  }
+
+  const adminSupabase = createAdminClient();
+
   const { data: running } = await supabase
     .from("agent_runs")
     .select("id")
@@ -62,8 +71,6 @@ export async function POST(
       { status: 500 }
     );
   }
-
-  const adminSupabase = createAdminClient();
 
   after(async () => {
     try {
