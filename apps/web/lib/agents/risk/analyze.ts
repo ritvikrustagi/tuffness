@@ -62,9 +62,10 @@ Rules:
 10. required_artifact must be one of: none, rfi, submittal, test_report, owner_approval, inspection, closeout_document.
 11. confidence must be a number from 0 to 1 based only on the strength of cited evidence.
 12. evidence_strength must be weak, moderate, or strong.
-13. draft_rfi is optional and should only be included when an RFI is the recommended artifact.
-14. Do not invent responsible party, trade, spec section, drawing sheet, blocked activity, cost, schedule, or compliance details not visible in the excerpts.
-15. Maximum 5 risks per topic.`;
+13. If required_artifact is rfi, draft_rfi must be included as a formal RFI question ready for human review.
+14. If draft_rfi is included, required_artifact must be rfi.
+15. Do not invent responsible party, trade, spec section, drawing sheet, blocked activity, cost, schedule, or compliance details not visible in the excerpts.
+16. Maximum 5 risks per topic.`;
 
   const userPrompt = `Topic: ${topic.label}
 

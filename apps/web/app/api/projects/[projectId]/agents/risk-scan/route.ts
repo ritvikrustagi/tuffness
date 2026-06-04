@@ -2,6 +2,11 @@ import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { requireProjectAccess } from "@/lib/api/auth";
 import { failRiskAgentRun, RiskScanError, runRiskScan } from "@/lib/agents/risk/runner";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+function isUniqueViolation(error: { code?: string } | null) {
+  return error?.code === "23505";
+}
 
 export async function POST(
   _request: Request,
@@ -44,6 +49,13 @@ export async function POST(
     .select("*")
     .single();
 
+  if (isUniqueViolation(runError)) {
+    return NextResponse.json(
+      { error: "A risk scan is already running for this project." },
+      { status: 409 }
+    );
+  }
+
   if (runError || !agentRun) {
     return NextResponse.json(
       { error: runError?.message ?? "Failed to create agent run" },
@@ -51,10 +63,12 @@ export async function POST(
     );
   }
 
+  const adminSupabase = createAdminClient();
+
   after(async () => {
     try {
       await runRiskScan({
-        supabase,
+        supabase: adminSupabase,
         projectId,
         organizationId: project!.organization_id,
         agentRunId: agentRun.id,
@@ -68,7 +82,7 @@ export async function POST(
               err instanceof Error ? err.message : "Risk scan failed",
               "db_error"
             );
-      await failRiskAgentRun(supabase, agentRun.id, scanError);
+      await failRiskAgentRun(adminSupabase, agentRun.id, scanError);
     }
   });
 

@@ -13,26 +13,46 @@ export const riskEvidenceSchema = z.object({
   quote: z.string().min(1),
 });
 
-export const riskFindingSchema = z.object({
-  risk_category: z.enum(riskCategories),
-  severity: z.enum(["low", "medium", "high", "critical"]),
-  cost_impact: z.enum(impactLevels),
-  schedule_impact: z.enum(impactLevels),
-  compliance_impact: z.enum(complianceImpacts),
-  required_artifact: z.enum(requiredArtifacts),
-  responsible_party: z.string().min(1).max(200).optional(),
-  responsible_trade: z.string().min(1).max(120).optional(),
-  spec_section: z.string().min(1).max(80).optional(),
-  drawing_sheet: z.string().min(1).max(80).optional(),
-  blocked_activity: z.string().min(1).max(300).optional(),
-  summary: z.string().min(1).max(500),
-  description: z.string().min(1).max(2500),
-  evidence: z.array(riskEvidenceSchema).min(1).max(10),
-  draft_rfi: z.string().min(1).max(4000).optional(),
-  confidence: z.number().min(0).max(1),
-  evidence_strength: z.enum(["weak", "moderate", "strong"]),
-  recommended_action: z.string().min(1).max(1000),
-});
+export const riskFindingSchema = z
+  .object({
+    risk_category: z.enum(riskCategories),
+    severity: z.enum(["low", "medium", "high", "critical"]),
+    cost_impact: z.enum(impactLevels),
+    schedule_impact: z.enum(impactLevels),
+    compliance_impact: z.enum(complianceImpacts),
+    required_artifact: z.enum(requiredArtifacts),
+    responsible_party: z.string().min(1).max(200).optional(),
+    responsible_trade: z.string().min(1).max(120).optional(),
+    spec_section: z.string().min(1).max(80).optional(),
+    drawing_sheet: z.string().min(1).max(80).optional(),
+    blocked_activity: z.string().min(1).max(300).optional(),
+    summary: z.string().min(1).max(500),
+    description: z.string().min(1).max(2500),
+    evidence: z.array(riskEvidenceSchema).min(1).max(10),
+    draft_rfi: z.string().min(1).max(4000).optional(),
+    confidence: z.number().min(0).max(1),
+    evidence_strength: z.enum(["weak", "moderate", "strong"]),
+    recommended_action: z.string().min(1).max(1000),
+  })
+  .superRefine((risk, ctx) => {
+    const hasDraftRfi = Boolean(risk.draft_rfi?.trim());
+
+    if (risk.required_artifact === "rfi" && !hasDraftRfi) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["draft_rfi"],
+        message: "draft_rfi is required when required_artifact is rfi",
+      });
+    }
+
+    if (hasDraftRfi && risk.required_artifact !== "rfi") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["required_artifact"],
+        message: "required_artifact must be rfi when draft_rfi is present",
+      });
+    }
+  });
 
 export const riskAgentOutputSchema = z.object({
   risks: z.array(riskFindingSchema).max(5),

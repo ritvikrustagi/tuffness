@@ -76,4 +76,31 @@ describe("riskAgentOutputSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  test("rejects an RFI artifact without a draft RFI", () => {
+    const result = riskAgentOutputSchema.safeParse({
+      risks: [
+        {
+          ...evidenceBackedFinding,
+          required_artifact: "rfi",
+          draft_rfi: undefined,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects a draft RFI when the required artifact is not RFI", () => {
+    const result = riskAgentOutputSchema.safeParse({
+      risks: [
+        {
+          ...evidenceBackedFinding,
+          required_artifact: "owner_approval",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

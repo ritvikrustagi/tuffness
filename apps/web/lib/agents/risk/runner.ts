@@ -3,8 +3,19 @@ import { RiskAnalysisError, analyzeRiskTopicGroup } from "@/lib/agents/risk/anal
 import type { RiskFinding } from "@/lib/agents/risk/schema";
 import { retrieveTopicChunkGroups } from "@/lib/agents/rfi/topics";
 import { normalizeIssueEvidence } from "@/lib/issues/workflow";
+import type { MatchedChunk } from "@/lib/rag/types";
 import { calculateRiskScore } from "@/lib/risks/scoring";
 import type { IssueType } from "@/lib/types/database";
+
+const MAX_RISKS_PER_RUN = 10;
+
+type RiskFailureCode = "llm_timeout" | "invalid_json" | "validation_failed";
+
+interface RiskTopicError {
+  topicLabel: string;
+  message: string;
+  code: RiskFailureCode;
+}
 
 export class RiskScanError extends Error {
   constructor(
@@ -46,6 +57,51 @@ function mapRiskCategoryToIssueType(risk: RiskFinding): IssueType {
   return "other";
 }
 
+function normalizeForMatch(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function evidenceItemSupported(
+  evidence: RiskFinding["evidence"][number],
+  chunks: MatchedChunk[]
+) {
+  const quote = normalizeForMatch(evidence.quote);
+  if (!quote) return false;
+
+  return chunks.some((chunk) => {
+    if (chunk.document_id !== evidence.document_id) return false;
+    if (chunk.page_number !== evidence.page_number) return false;
+    return normalizeForMatch(chunk.content).includes(quote);
+  });
+}
+
+function riskEvidenceSupported(risk: RiskFinding, chunks: MatchedChunk[]) {
+  return risk.evidence.every((evidence) => evidenceItemSupported(evidence, chunks));
+}
+
+function riskDedupeKey(risk: RiskFinding) {
+  const firstEvidence = risk.evidence[0];
+  return [
+    normalizeForMatch(risk.risk_category),
+    normalizeForMatch(risk.summary),
+    firstEvidence.document_id,
+    firstEvidence.page_number,
+    normalizeForMatch(firstEvidence.quote),
+  ].join("|");
+}
+
+function summarizeErrors(errors: RiskTopicError[]) {
+  return errors.map((error) => `${error.topicLabel}: ${error.message}`);
+}
+
+function finalFailureCode(errors: RiskTopicError[]): RiskFailureCode {
+  if (errors.some((error) => error.code === "llm_timeout")) return "llm_timeout";
+  if (errors.length > 0 && errors.every((error) => error.code === "validation_failed")) {
+    return "validation_failed";
+  }
+  return "invalid_json";
+}
+
 async function persistRiskFinding(
   supabase: SupabaseClient,
   params: {
@@ -54,7 +110,6 @@ async function persistRiskFinding(
     agentRunId: string;
     userId: string;
     risk: RiskFinding;
-    topicLabel: string;
   }
 ): Promise<{ rfiCreated: boolean }> {
   const evidence = normalizeIssueEvidence(params.risk.evidence);
@@ -67,68 +122,41 @@ async function persistRiskFinding(
     evidence_count: evidence.length,
     blocks_work: Boolean(params.risk.blocked_activity),
   });
-  const status = params.risk.draft_rfi ? "draft_rfi" : "open";
-
-  const { data: issueRow, error: issueError } = await supabase
-    .from("issues")
-    .insert({
-      project_id: params.projectId,
-      organization_id: params.organizationId,
-      agent_run_id: params.agentRunId,
-      issue_type: mapRiskCategoryToIssueType(params.risk),
-      severity: params.risk.severity,
-      status,
-      summary: params.risk.summary,
-      description:
-        params.risk.description ??
-        `Detected during risk scan (${params.topicLabel}). Pending human review.`,
-      evidence,
-      draft_rfi: params.risk.draft_rfi ?? null,
-      confidence: params.risk.confidence,
-      trade: params.risk.responsible_trade ?? null,
-      recommended_action: params.risk.recommended_action,
-      risk_category: params.risk.risk_category,
-      risk_score,
-      risk_tier,
-      cost_impact: params.risk.cost_impact,
-      schedule_impact: params.risk.schedule_impact,
-      compliance_impact: params.risk.compliance_impact,
-      responsible_party: params.risk.responsible_party ?? null,
-      responsible_trade: params.risk.responsible_trade ?? null,
-      spec_section: params.risk.spec_section ?? null,
-      drawing_sheet: params.risk.drawing_sheet ?? null,
-      required_artifact: params.risk.required_artifact,
-      blocked_activity: params.risk.blocked_activity ?? null,
-      risk_reasoning: params.risk.description,
-      evidence_strength: params.risk.evidence_strength,
-      created_by: params.userId,
-    })
-    .select("id")
-    .single();
-
-  if (issueError || !issueRow) {
-    throw new RiskScanError(issueError?.message ?? "Failed to insert risk issue", "db_error");
-  }
-
-  if (!params.risk.draft_rfi) {
-    return { rfiCreated: false };
-  }
-
-  const { error: rfiError } = await supabase.from("rfis").insert({
-    project_id: params.projectId,
-    organization_id: params.organizationId,
-    issue_id: issueRow.id,
-    subject: params.risk.summary.slice(0, 200),
-    question: params.risk.draft_rfi,
-    status: "draft",
-    created_by: params.userId,
+  const { error } = await supabase.rpc("create_risk_issue_with_optional_rfi", {
+    p_project_id: params.projectId,
+    p_organization_id: params.organizationId,
+    p_agent_run_id: params.agentRunId,
+    p_user_id: params.userId,
+    p_issue_type: mapRiskCategoryToIssueType(params.risk),
+    p_severity: params.risk.severity,
+    p_summary: params.risk.summary,
+    p_description: params.risk.description,
+    p_evidence: evidence,
+    p_draft_rfi: params.risk.draft_rfi ?? null,
+    p_confidence: params.risk.confidence,
+    p_trade: params.risk.responsible_trade ?? null,
+    p_recommended_action: params.risk.recommended_action,
+    p_risk_category: params.risk.risk_category,
+    p_risk_score: risk_score,
+    p_risk_tier: risk_tier,
+    p_cost_impact: params.risk.cost_impact,
+    p_schedule_impact: params.risk.schedule_impact,
+    p_compliance_impact: params.risk.compliance_impact,
+    p_responsible_party: params.risk.responsible_party ?? null,
+    p_responsible_trade: params.risk.responsible_trade ?? null,
+    p_spec_section: params.risk.spec_section ?? null,
+    p_drawing_sheet: params.risk.drawing_sheet ?? null,
+    p_required_artifact: params.risk.required_artifact,
+    p_blocked_activity: params.risk.blocked_activity ?? null,
+    p_risk_reasoning: params.risk.description,
+    p_evidence_strength: params.risk.evidence_strength,
   });
 
-  if (rfiError) {
-    throw new RiskScanError(rfiError.message, "db_error");
+  if (error) {
+    throw new RiskScanError(error.message, "db_error");
   }
 
-  return { rfiCreated: true };
+  return { rfiCreated: params.risk.required_artifact === "rfi" };
 }
 
 export async function runRiskScan(params: {
@@ -168,9 +196,19 @@ export async function runRiskScan(params: {
   let risksCreated = 0;
   let rfisCreated = 0;
   let skippedTopics = 0;
-  const errors: string[] = [];
+  let topicsAnalyzed = 0;
+  const errors: RiskTopicError[] = [];
+  const riskKeys = new Set<string>();
 
-  for (const group of topicGroups) {
+  for (let index = 0; index < topicGroups.length; index += 1) {
+    if (risksCreated >= MAX_RISKS_PER_RUN) {
+      skippedTopics += topicGroups.length - index;
+      break;
+    }
+
+    const group = topicGroups[index];
+    topicsAnalyzed += 1;
+
     try {
       const output = await analyzeRiskTopicGroup(group.topic, group.chunks);
 
@@ -180,20 +218,47 @@ export async function runRiskScan(params: {
       }
 
       for (const risk of output.risks) {
+        if (risksCreated >= MAX_RISKS_PER_RUN) {
+          errors.push({
+            topicLabel: group.topic.label,
+            message: `risk cap reached; skipped remaining findings after ${MAX_RISKS_PER_RUN} risks`,
+            code: "validation_failed",
+          });
+          break;
+        }
+
+        if (!riskEvidenceSupported(risk, group.chunks)) {
+          errors.push({
+            topicLabel: group.topic.label,
+            message: `unsupported evidence for ${risk.summary}`,
+            code: "validation_failed",
+          });
+          continue;
+        }
+
+        const dedupeKey = riskDedupeKey(risk);
+        if (riskKeys.has(dedupeKey)) {
+          continue;
+        }
+        riskKeys.add(dedupeKey);
+
         const result = await persistRiskFinding(supabase, {
           projectId,
           organizationId,
           agentRunId,
           userId,
           risk,
-          topicLabel: group.topic.label,
         });
         risksCreated += 1;
         if (result.rfiCreated) rfisCreated += 1;
       }
     } catch (err) {
       if (err instanceof RiskAnalysisError) {
-        errors.push(`${group.topic.label}: ${err.message}`);
+        errors.push({
+          topicLabel: group.topic.label,
+          message: err.message,
+          code: err.code,
+        });
         skippedTopics += 1;
         continue;
       }
@@ -201,11 +266,10 @@ export async function runRiskScan(params: {
     }
   }
 
-  if (risksCreated === 0 && errors.length === topicGroups.length) {
-    const hasTimeout = errors.some((e) => e.includes("timed out"));
+  if (risksCreated === 0 && errors.length >= topicsAnalyzed && topicsAnalyzed > 0) {
     throw new RiskScanError(
-      errors[0] ?? "All topic analyses failed",
-      hasTimeout ? "llm_timeout" : "invalid_json"
+      summarizeErrors(errors)[0] ?? "All topic analyses failed",
+      finalFailureCode(errors)
     );
   }
 
@@ -215,18 +279,18 @@ export async function runRiskScan(params: {
     output_summary: {
       risks_created: risksCreated,
       rfis_created: rfisCreated,
-      topics_analyzed: topicGroups.length,
+      topics_analyzed: topicsAnalyzed,
       skipped_topics: skippedTopics,
-      errors,
+      errors: summarizeErrors(errors),
     },
   });
 
   return {
     risksCreated,
     rfisCreated,
-    topicsAnalyzed: topicGroups.length,
+    topicsAnalyzed,
     skippedTopics,
-    errors,
+    errors: summarizeErrors(errors),
   };
 }
 
@@ -235,7 +299,7 @@ export async function failRiskAgentRun(
   agentRunId: string,
   error: RiskScanError
 ) {
-  await supabase
+  const { error: updateError } = await supabase
     .from("agent_runs")
     .update({
       status: "failed",
@@ -244,4 +308,8 @@ export async function failRiskAgentRun(
       output_summary: { code: error.code },
     })
     .eq("id", agentRunId);
+
+  if (updateError) {
+    throw new RiskScanError(updateError.message, "db_error");
+  }
 }
