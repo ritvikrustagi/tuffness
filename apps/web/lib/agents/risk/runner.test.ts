@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { RiskFinding } from "./schema";
 import type { MatchedChunk } from "@/lib/rag/types";
+import { riskScanProfiles } from "./profile";
 import {
   buildRiskRunSummary,
   createRiskDedupeKey,
@@ -93,6 +94,33 @@ describe("risk scan runner helpers", () => {
     });
   });
 
+  test("run summary surfaces non-fatal policy skipped findings", () => {
+    expect(
+      buildRiskRunSummary({
+        mode: "compliance_register_scan",
+        risksCreated: 0,
+        rfisCreated: 0,
+        topicsAnalyzed: 1,
+        skippedTopics: 0,
+        errors: [],
+        skippedFindings: [
+          {
+            topicLabel: "Doors",
+            message: "non-compliance finding skipped: Door rating mismatch",
+          },
+        ],
+      })
+    ).toEqual({
+      risks_created: 0,
+      rfis_created: 0,
+      topics_analyzed: 1,
+      skipped_topics: 0,
+      mode: "compliance_register_scan",
+      errors: [],
+      skipped_findings: ["Doors: non-compliance finding skipped: Door rating mismatch"],
+    });
+  });
+
   test("selectPersistableRiskFindings filters unsupported evidence, dedupes, and enforces cap", () => {
     const riskKeys = new Set<string>();
     const chunks = [
@@ -129,6 +157,7 @@ describe("risk scan runner helpers", () => {
       risks: [duplicateRisk, duplicateRisk, unsupportedRisk],
       riskKeys,
       remainingSlots: 1,
+      scanProfile: riskScanProfiles.risk_register_scan,
     });
 
     expect(result.risks).toEqual([duplicateRisk]);
@@ -141,6 +170,85 @@ describe("risk scan runner helpers", () => {
         code: "validation_failed",
       },
     ]);
+  });
+
+  test("selectPersistableRiskFindings skips findings blocked by scan policy without fatal errors", () => {
+    const chunks = [
+      {
+        id: "chunk-1",
+        document_id: "11111111-1111-4111-8111-111111111111",
+        document_page_id: "page-1",
+        document_name: "Drawings",
+        page_number: 4,
+        content: "Door 101 rating not indicated",
+        content_type: "text",
+        metadata: {},
+        similarity: 0.9,
+        sheet_number: null,
+        sheet_title: null,
+      },
+    ] satisfies MatchedChunk[];
+    const nonComplianceRisk = {
+      ...baseRisk,
+      compliance_impact: "none",
+      required_artifact: "none",
+      evidence: [baseRisk.evidence[0]],
+    } satisfies RiskFinding;
+
+    const result = selectPersistableRiskFindings({
+      topicLabel: "Doors",
+      chunks,
+      risks: [nonComplianceRisk],
+      riskKeys: new Set<string>(),
+      remainingSlots: 1,
+      scanProfile: riskScanProfiles.compliance_register_scan,
+    });
+
+    expect(result.risks).toEqual([]);
+    expect(result.errors).toEqual([]);
+    expect(result.skippedFindings).toEqual([
+      {
+        topicLabel: "Doors",
+        message: "non-compliance finding skipped: Door rating mismatch",
+      },
+    ]);
+  });
+
+  test("risk scan profile keeps ordinary evidence-backed risks eligible", () => {
+    const chunks = [
+      {
+        id: "chunk-1",
+        document_id: "11111111-1111-4111-8111-111111111111",
+        document_page_id: "page-1",
+        document_name: "Drawings",
+        page_number: 4,
+        content: "Door 101 rating not indicated",
+        content_type: "text",
+        metadata: {},
+        similarity: 0.9,
+        sheet_number: null,
+        sheet_title: null,
+      },
+    ] satisfies MatchedChunk[];
+    const nonComplianceRisk = {
+      ...baseRisk,
+      compliance_impact: "none",
+      required_artifact: "none",
+      evidence: [baseRisk.evidence[0]],
+    } satisfies RiskFinding;
+
+    const result = selectPersistableRiskFindings({
+      topicLabel: "Doors",
+      chunks,
+      risks: [nonComplianceRisk],
+      riskKeys: new Set<string>(),
+      remainingSlots: 1,
+      scanProfile: riskScanProfiles.risk_register_scan,
+    });
+
+    expect(result.risks).toEqual([nonComplianceRisk]);
+    expect(result.errors).toEqual([]);
+    expect(result.skippedFindings).toEqual([]);
   });
 
   test("failRiskAgentRun writes default summary shape for plain scan errors", async () => {

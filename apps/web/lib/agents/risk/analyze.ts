@@ -11,10 +11,9 @@ import {
   requiredArtifacts,
   riskCategories,
 } from "@/lib/risks/types";
+import { getRiskScanProfile, type RiskScanMode } from "@/lib/agents/risk/profile";
 
 const LLM_TIMEOUT_MS = 45_000;
-
-export type RiskScanMode = "risk_register_scan" | "compliance_register_scan";
 
 export class RiskAnalysisError extends Error {
   constructor(
@@ -38,43 +37,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-function scanFocus(mode: RiskScanMode) {
-  if (mode === "compliance_register_scan") {
-    return {
-      title: "AI compliance register scan",
-      focus: `Look ONLY for evidence-backed compliance worklist items that could affect:
-- submittal requirements
-- inspection, testing, report, certificate, commissioning, or verification requirements
-- owner, architect, engineer, AHJ, or design-team approval
-- possible specification deviation
-- closeout or turnover requirements
-- RFI clarification needed to satisfy a project requirement`,
-    };
-  }
-
-  return {
-    title: "AI risk register scan",
-    focus: `Look ONLY for evidence-backed construction risks that could affect:
-- cost exposure
-- schedule or blocked work
-- coordination
-- submittal or owner approval requirements
-- possible specification deviation
-- possible code, inspection, testing, or life-safety review needs`,
-  };
-}
-
 export function buildRiskSystemPrompt(
   topicLabel: string,
   mode: RiskScanMode = "risk_register_scan"
 ) {
-  const focus = scanFocus(mode);
+  const profile = getRiskScanProfile(mode);
 
-  return `You are a senior construction professional engineer assisting a project team with an ${focus.title}.
+  return `You are a senior construction professional engineer assisting a project team with an ${profile.title}.
 
 Analyze the document excerpts for the topic: ${topicLabel}.
 
-${focus.focus}
+${profile.focus}
 
 Rules:
 1. Return JSON only matching the required schema.

@@ -2,13 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   RiskAnalysisError,
   analyzeRiskTopicGroup,
-  type RiskScanMode,
 } from "@/lib/agents/risk/analyze";
+import { getRiskScanProfile, type RiskScanMode } from "@/lib/agents/risk/profile";
 import type { RiskFinding } from "@/lib/agents/risk/schema";
 import {
   createRiskDedupeKey,
   selectPersistableRiskFindings,
   type RiskFailureCode,
+  type RiskSkippedFinding,
   type RiskTopicError,
 } from "@/lib/agents/risk/selection";
 import { retrieveTopicChunkGroups } from "@/lib/agents/rfi/topics";
@@ -27,6 +28,7 @@ export interface RiskRunSummary {
   topics_analyzed: number;
   skipped_topics: number;
   errors: string[];
+  skipped_findings?: string[];
   code?: RiskScanError["code"];
 }
 
@@ -53,6 +55,7 @@ export interface RiskScanResult {
   topicsAnalyzed: number;
   skippedTopics: number;
   errors: string[];
+  skippedFindings: string[];
 }
 
 async function updateAgentRun(
@@ -75,6 +78,10 @@ function summarizeErrors(errors: RiskTopicError[]) {
   return errors.map((error) => `${error.topicLabel}: ${error.message}`);
 }
 
+function summarizeSkippedFindings(skippedFindings: RiskSkippedFinding[]) {
+  return skippedFindings.map((finding) => `${finding.topicLabel}: ${finding.message}`);
+}
+
 function finalFailureCode(errors: RiskTopicError[]): RiskFailureCode {
   if (errors.some((error) => error.code === "llm_timeout")) return "llm_timeout";
   if (errors.length > 0 && errors.every((error) => error.code === "validation_failed")) {
@@ -90,8 +97,11 @@ export function buildRiskRunSummary(params: {
   topicsAnalyzed: number;
   skippedTopics: number;
   errors: RiskTopicError[];
+  skippedFindings?: RiskSkippedFinding[];
   code?: RiskScanError["code"];
 }): RiskRunSummary {
+  const skippedFindings = summarizeSkippedFindings(params.skippedFindings ?? []);
+
   return {
     mode: params.mode ?? "risk_register_scan",
     risks_created: params.risksCreated,
@@ -99,6 +109,7 @@ export function buildRiskRunSummary(params: {
     topics_analyzed: params.topicsAnalyzed,
     skipped_topics: params.skippedTopics,
     errors: summarizeErrors(params.errors),
+    ...(skippedFindings.length ? { skipped_findings: skippedFindings } : {}),
     ...(params.code ? { code: params.code } : {}),
   };
 }
@@ -176,6 +187,7 @@ export async function runRiskScan(params: {
     userId,
     mode = "risk_register_scan",
   } = params;
+  const scanProfile = getRiskScanProfile(mode);
 
   await updateAgentRun(supabase, agentRunId, {
     status: "running",
@@ -207,6 +219,7 @@ export async function runRiskScan(params: {
   let skippedTopics = 0;
   let topicsAnalyzed = 0;
   const errors: RiskTopicError[] = [];
+  const skippedFindings: RiskSkippedFinding[] = [];
   const riskKeys = new Set<string>();
 
   for (let index = 0; index < topicGroups.length; index += 1) {
@@ -233,8 +246,10 @@ export async function runRiskScan(params: {
         riskKeys,
         remainingSlots: MAX_RISKS_PER_RUN - risksCreated,
         maxRisksPerRun: MAX_RISKS_PER_RUN,
+        scanProfile,
       });
       errors.push(...selected.errors);
+      skippedFindings.push(...selected.skippedFindings);
       for (const dedupeKey of selected.dedupeKeys) {
         riskKeys.add(dedupeKey);
       }
@@ -272,6 +287,7 @@ export async function runRiskScan(params: {
       topicsAnalyzed,
       skippedTopics,
       errors,
+      skippedFindings,
       code,
       mode,
     });
@@ -288,6 +304,7 @@ export async function runRiskScan(params: {
     topicsAnalyzed,
     skippedTopics,
     errors,
+    skippedFindings,
     mode,
   });
 
@@ -303,6 +320,7 @@ export async function runRiskScan(params: {
     topicsAnalyzed,
     skippedTopics,
     errors: summary.errors,
+    skippedFindings: summary.skipped_findings ?? [],
   };
 }
 

@@ -1,16 +1,5 @@
 import type { ComplianceImpact, RequiredArtifact, RiskEvidence, RiskLike } from "./types";
 
-export const complianceGroups = [
-  "rfi_needed",
-  "submittal_required",
-  "inspection_or_testing_required",
-  "owner_approval_required",
-  "possible_spec_deviation",
-  "closeout_required",
-] as const;
-
-export type ComplianceGroup = (typeof complianceGroups)[number];
-
 export type ComplianceSummary = {
   total: number;
   open: number;
@@ -23,14 +12,94 @@ export type ComplianceSummary = {
   awaiting_review: number;
 };
 
-const artifactGroups: Partial<Record<RequiredArtifact, ComplianceGroup>> = {
-  rfi: "rfi_needed",
-  submittal: "submittal_required",
-  test_report: "inspection_or_testing_required",
-  inspection: "inspection_or_testing_required",
-  owner_approval: "owner_approval_required",
-  closeout_document: "closeout_required",
+type ComplianceSummaryBucket = Exclude<
+  keyof ComplianceSummary,
+  "total" | "open" | "high_impact" | "awaiting_review"
+>;
+
+export const complianceGroups = [
+  "rfi_needed",
+  "submittal_required",
+  "inspection_or_testing_required",
+  "owner_approval_required",
+  "possible_spec_deviation",
+  "closeout_required",
+] as const;
+
+export type ComplianceGroup = (typeof complianceGroups)[number];
+
+type ComplianceGroupDefinition = {
+  summaryKey: ComplianceSummaryBucket | null;
+  artifacts: readonly RequiredArtifact[];
+  impacts: readonly ComplianceImpact[];
 };
+
+const complianceGroupDefinitions: Record<ComplianceGroup, ComplianceGroupDefinition> = {
+  rfi_needed: {
+    summaryKey: "rfi_needed",
+    artifacts: ["rfi"],
+    impacts: [],
+  },
+  submittal_required: {
+    summaryKey: "submittals_required",
+    artifacts: ["submittal"],
+    impacts: ["submittal_required"],
+  },
+  inspection_or_testing_required: {
+    summaryKey: "inspection_or_testing_required",
+    artifacts: ["test_report", "inspection"],
+    impacts: ["inspection_or_testing_required"],
+  },
+  owner_approval_required: {
+    summaryKey: "owner_approvals_required",
+    artifacts: ["owner_approval"],
+    impacts: ["owner_approval_required"],
+  },
+  possible_spec_deviation: {
+    summaryKey: null,
+    artifacts: [],
+    impacts: ["spec_deviation"],
+  },
+  closeout_required: {
+    summaryKey: "closeout_required",
+    artifacts: ["closeout_document"],
+    impacts: ["closeout_required"],
+  },
+};
+
+function definitionIncludesArtifact(
+  definition: { artifacts: readonly RequiredArtifact[] },
+  artifact: RequiredArtifact
+) {
+  return definition.artifacts.includes(artifact);
+}
+
+function definitionIncludesImpact(
+  definition: { impacts: readonly ComplianceImpact[] },
+  impact: ComplianceImpact
+) {
+  return definition.impacts.includes(impact);
+}
+
+function groupForArtifact(artifact: RequiredArtifact | null | undefined) {
+  if (!artifact || artifact === "none") return null;
+
+  return (
+    complianceGroups.find((group) =>
+      definitionIncludesArtifact(complianceGroupDefinitions[group], artifact)
+    ) ?? null
+  );
+}
+
+function groupForImpact(impact: ComplianceImpact | null | undefined) {
+  if (!impact || impact === "none") return null;
+
+  return (
+    complianceGroups.find((group) =>
+      definitionIncludesImpact(complianceGroupDefinitions[group], impact)
+    ) ?? null
+  );
+}
 
 function isClosed(risk: RiskLike) {
   return risk.status === "resolved" || risk.status === "dismissed";
@@ -53,20 +122,10 @@ function responsibleText(risk: RiskLike) {
   return parts.length ? parts.join(" / ") : "Not assigned";
 }
 
-export function getComplianceGroup(risk: Pick<RiskLike, "required_artifact" | "compliance_impact">): ComplianceGroup | null {
-  if (risk.required_artifact && risk.required_artifact !== "none") {
-    return artifactGroups[risk.required_artifact] ?? null;
-  }
-
-  if (risk.compliance_impact === "spec_deviation") return "possible_spec_deviation";
-  if (risk.compliance_impact === "submittal_required") return "submittal_required";
-  if (risk.compliance_impact === "owner_approval_required") return "owner_approval_required";
-  if (risk.compliance_impact === "inspection_or_testing_required") {
-    return "inspection_or_testing_required";
-  }
-  if (risk.compliance_impact === "closeout_required") return "closeout_required";
-
-  return null;
+export function getComplianceGroup(
+  risk: Pick<RiskLike, "required_artifact" | "compliance_impact">
+): ComplianceGroup | null {
+  return groupForArtifact(risk.required_artifact) ?? groupForImpact(risk.compliance_impact);
 }
 
 export function isComplianceRisk(risk: Pick<RiskLike, "required_artifact" | "compliance_impact">) {
@@ -99,13 +158,8 @@ export function summarizeComplianceRisks(risks: RiskLike[]): ComplianceSummary {
       if (!closed && !risk.human_reviewed_at) summary.awaiting_review += 1;
       if (!closed && isHighPriorityCompliance(risk)) summary.high_impact += 1;
 
-      if (!closed && group === "rfi_needed") summary.rfi_needed += 1;
-      if (!closed && group === "submittal_required") summary.submittals_required += 1;
-      if (!closed && group === "inspection_or_testing_required") {
-        summary.inspection_or_testing_required += 1;
-      }
-      if (!closed && group === "owner_approval_required") summary.owner_approvals_required += 1;
-      if (!closed && group === "closeout_required") summary.closeout_required += 1;
+      const summaryKey = group ? complianceGroupDefinitions[group].summaryKey : null;
+      if (!closed && summaryKey) summary[summaryKey] += 1;
 
       return summary;
     },

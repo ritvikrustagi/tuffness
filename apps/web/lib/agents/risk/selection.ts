@@ -1,4 +1,5 @@
 import type { RiskFinding } from "@/lib/agents/risk/schema";
+import type { RiskScanProfile } from "@/lib/agents/risk/profile";
 import type { MatchedChunk } from "@/lib/rag/types";
 
 export type RiskFailureCode = "llm_timeout" | "invalid_json" | "validation_failed";
@@ -7,6 +8,11 @@ export interface RiskTopicError {
   topicLabel: string;
   message: string;
   code: RiskFailureCode;
+}
+
+export interface RiskSkippedFinding {
+  topicLabel: string;
+  message: string;
 }
 
 function normalizeForMatch(value: string) {
@@ -56,10 +62,17 @@ export function selectPersistableRiskFindings(params: {
   riskKeys: Set<string>;
   remainingSlots: number;
   maxRisksPerRun?: number;
-}): { risks: RiskFinding[]; dedupeKeys: string[]; errors: RiskTopicError[] } {
+  scanProfile: RiskScanProfile;
+}): {
+  risks: RiskFinding[];
+  dedupeKeys: string[];
+  errors: RiskTopicError[];
+  skippedFindings: RiskSkippedFinding[];
+} {
   const selectedRisks: RiskFinding[] = [];
   const dedupeKeys: string[] = [];
   const errors: RiskTopicError[] = [];
+  const skippedFindings: RiskSkippedFinding[] = [];
   const cap = params.maxRisksPerRun ?? params.remainingSlots;
 
   for (const risk of params.risks) {
@@ -70,6 +83,14 @@ export function selectPersistableRiskFindings(params: {
         code: "validation_failed",
       });
       break;
+    }
+
+    if (!params.scanProfile.acceptsRisk(risk)) {
+      skippedFindings.push({
+        topicLabel: params.topicLabel,
+        message: `${params.scanProfile.rejectionMessage}: ${risk.summary}`,
+      });
+      continue;
     }
 
     if (!riskEvidenceSupported(risk, params.chunks)) {
@@ -89,5 +110,5 @@ export function selectPersistableRiskFindings(params: {
     selectedRisks.push(risk);
   }
 
-  return { risks: selectedRisks, dedupeKeys, errors };
+  return { risks: selectedRisks, dedupeKeys, errors, skippedFindings };
 }

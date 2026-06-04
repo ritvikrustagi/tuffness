@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { requireProjectAccess } from "@/lib/api/auth";
 import { failRiskAgentRun, RiskScanError, runRiskScan } from "@/lib/agents/risk/runner";
-import type { RiskScanMode } from "@/lib/agents/risk/analyze";
+import type { RiskScanMode } from "@/lib/agents/risk/profile";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function isUniqueViolation(error: { code?: string } | null) {

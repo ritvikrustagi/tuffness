@@ -4,54 +4,42 @@ import { useMemo, useState } from "react";
 import type { Issue } from "@/lib/types/database";
 import {
   complianceGroups,
-  getComplianceGroup,
-  isComplianceRisk,
   summarizeComplianceRisks,
-  type ComplianceGroup,
 } from "@/lib/risks/compliance";
 import { buildComplianceCsv, buildRiskCsv } from "@/lib/risks/export";
 import { complianceImpacts, requiredArtifacts, riskTiers } from "@/lib/risks/types";
+import {
+  filterRiskRegisterRisks,
+  type RiskRegisterArtifactFilter,
+  type RiskRegisterComplianceFilter,
+  type RiskRegisterGroupFilter,
+  type RiskRegisterTierFilter,
+  type RiskRegisterView,
+} from "@/lib/risks/register";
 import { summarizeRisks } from "@/lib/risks/summary";
 import { RiskCard } from "@/components/risks/risk-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-
-type TierFilter = "all" | NonNullable<Issue["risk_tier"]>;
-type ComplianceFilter = "all" | NonNullable<Issue["compliance_impact"]>;
-type ArtifactFilter = "all" | NonNullable<Issue["required_artifact"]>;
-type GroupFilter = "all" | ComplianceGroup;
-type RegisterView = "all" | "compliance";
 
 function formatLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
 export function RiskRegister({ projectId, risks }: { projectId: string; risks: Issue[] }) {
-  const [view, setView] = useState<RegisterView>("all");
-  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
-  const [complianceFilter, setComplianceFilter] = useState<ComplianceFilter>("all");
-  const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("all");
-  const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
+  const [view, setView] = useState<RiskRegisterView>("all");
+  const [tierFilter, setTierFilter] = useState<RiskRegisterTierFilter>("all");
+  const [complianceFilter, setComplianceFilter] = useState<RiskRegisterComplianceFilter>("all");
+  const [artifactFilter, setArtifactFilter] = useState<RiskRegisterArtifactFilter>("all");
+  const [groupFilter, setGroupFilter] = useState<RiskRegisterGroupFilter>("all");
 
   const filteredRisks = useMemo(
     () =>
-      risks.filter((risk) => {
-        const matchesView = view === "all" || isComplianceRisk(risk);
-        const matchesTier = tierFilter === "all" || risk.risk_tier === tierFilter;
-        const matchesCompliance =
-          complianceFilter === "all" || risk.compliance_impact === complianceFilter;
-        const matchesArtifact =
-          artifactFilter === "all" || risk.required_artifact === artifactFilter;
-        const matchesGroup =
-          groupFilter === "all" || getComplianceGroup(risk) === groupFilter;
-
-        return (
-          matchesView &&
-          matchesTier &&
-          matchesCompliance &&
-          matchesArtifact &&
-          matchesGroup
-        );
+      filterRiskRegisterRisks(risks, {
+        view,
+        tierFilter,
+        complianceFilter,
+        artifactFilter,
+        groupFilter,
       }),
     [artifactFilter, complianceFilter, groupFilter, risks, tierFilter, view]
   );
@@ -112,7 +100,7 @@ export function RiskRegister({ projectId, risks }: { projectId: string; risks: I
             key={value}
             type="button"
             variant={view === value ? "primary" : "secondary"}
-            onClick={() => setView(value as RegisterView)}
+            onClick={() => setView(value as RiskRegisterView)}
           >
             {label}
           </Button>
@@ -138,7 +126,7 @@ export function RiskRegister({ projectId, risks }: { projectId: string; risks: I
             <span className="mb-1 block">Tier</span>
             <select
               value={tierFilter}
-              onChange={(event) => setTierFilter(event.target.value as TierFilter)}
+              onChange={(event) => setTierFilter(event.target.value as RiskRegisterTierFilter)}
               className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm capitalize text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             >
               <option value="all">All tiers</option>
@@ -155,7 +143,9 @@ export function RiskRegister({ projectId, risks }: { projectId: string; risks: I
               <span className="mb-1 block">Group</span>
               <select
                 value={groupFilter}
-                onChange={(event) => setGroupFilter(event.target.value as GroupFilter)}
+                onChange={(event) =>
+                  setGroupFilter(event.target.value as RiskRegisterGroupFilter)
+                }
                 className="h-10 max-w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm capitalize text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               >
                 <option value="all">All groups</option>
@@ -172,7 +162,9 @@ export function RiskRegister({ projectId, risks }: { projectId: string; risks: I
             <span className="mb-1 block">Compliance</span>
             <select
               value={complianceFilter}
-              onChange={(event) => setComplianceFilter(event.target.value as ComplianceFilter)}
+              onChange={(event) =>
+                setComplianceFilter(event.target.value as RiskRegisterComplianceFilter)
+              }
               className="h-10 max-w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm capitalize text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             >
               <option value="all">All compliance</option>
@@ -189,7 +181,9 @@ export function RiskRegister({ projectId, risks }: { projectId: string; risks: I
               <span className="mb-1 block">Required artifact</span>
               <select
                 value={artifactFilter}
-                onChange={(event) => setArtifactFilter(event.target.value as ArtifactFilter)}
+                onChange={(event) =>
+                  setArtifactFilter(event.target.value as RiskRegisterArtifactFilter)
+                }
                 className="h-10 max-w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm capitalize text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               >
                 <option value="all">All artifacts</option>
