@@ -129,4 +129,76 @@ describe("project dashboard summaries", () => {
     expect(dashboard.riskSummary.compliance_exposure).toBe(2);
     expect(dashboard.topRisks.map((risk) => risk.id)).toEqual(["risk-1", "risk-2"]);
   });
+
+  test("does not count human reviewed risks as awaiting review", () => {
+    const dashboard = buildProjectDashboard({
+      projectId: "project-1",
+      documents: [],
+      issues: [
+        {
+          id: "risk-1",
+          summary: "Reviewed life safety conflict",
+          severity: "high",
+          status: "open",
+          rfis: [],
+          risk_tier: "critical",
+          risk_score: 92,
+          compliance_impact: "code_or_life_safety",
+          required_artifact: "rfi",
+          human_reviewed_at: "2026-06-03T12:00:00.000Z",
+        },
+        {
+          id: "risk-2",
+          summary: "Unreviewed submittal risk",
+          severity: "medium",
+          status: "open",
+          rfis: [],
+          risk_tier: "high",
+          risk_score: 70,
+          compliance_impact: "submittal_required",
+          required_artifact: "submittal",
+          human_reviewed_at: null,
+        },
+      ],
+      submittals: [],
+      agentRuns: [],
+    });
+
+    expect(dashboard.riskSummary.awaiting_review).toBe(1);
+  });
+
+  test("excludes closed risks from top risks", () => {
+    const dashboard = buildProjectDashboard({
+      projectId: "project-1",
+      documents: [],
+      issues: [
+        {
+          id: "risk-closed",
+          summary: "Resolved highest score risk",
+          severity: "high",
+          status: "resolved",
+          rfis: [],
+          risk_tier: "critical",
+          risk_score: 100,
+          compliance_impact: "code_or_life_safety",
+          required_artifact: "rfi",
+        },
+        {
+          id: "risk-open",
+          summary: "Open lower score risk",
+          severity: "medium",
+          status: "open",
+          rfis: [],
+          risk_tier: "high",
+          risk_score: 70,
+          compliance_impact: "submittal_required",
+          required_artifact: "submittal",
+        },
+      ],
+      submittals: [],
+      agentRuns: [],
+    });
+
+    expect(dashboard.topRisks.map((risk) => risk.id)).toEqual(["risk-open"]);
+  });
 });

@@ -35,6 +35,7 @@ type ProjectDashboardIssue = {
   status: IssueStatus;
   rfis?: Array<{ status: RfiStatus }> | null;
   summary?: string | null;
+  human_reviewed_at?: string | null;
   risk_tier?: RiskLike["risk_tier"];
   risk_score?: number | null;
   compliance_impact?: RiskLike["compliance_impact"];
@@ -100,6 +101,10 @@ export function summarizeSubmittals(
   );
 }
 
+function isClosedRisk(issue: ProjectDashboardIssue) {
+  return issue.status === "resolved" || issue.status === "dismissed";
+}
+
 export function buildProjectDashboard<
   TDocument extends { status: DocumentStatus },
   TIssue extends ProjectDashboardIssue,
@@ -118,6 +123,11 @@ export function buildProjectDashboard<
   TAgentRun
 > {
   const risks = issues.filter((issue) => issue.risk_tier);
+  const riskSummaryInput = risks.map((risk) => ({
+    ...risk,
+    id: risk.human_reviewed_at ? `reviewed:${risk.id ?? ""}` : risk.id,
+  }));
+  const openRisks = risks.filter((risk) => !isClosedRisk(risk));
 
   return {
     projectId,
@@ -128,11 +138,11 @@ export function buildProjectDashboard<
     documentSummary: summarizeDocuments(documents),
     issueSummary: summarizeIssueWorkflows(issues),
     submittalSummary: summarizeSubmittals(submittals),
-    riskSummary: summarizeRisks(risks),
+    riskSummary: summarizeRisks(riskSummaryInput),
     recentDocuments: documents.slice(0, 3),
     recentIssues: issues.slice(0, 3),
     recentSubmittals: submittals.slice(0, 3),
-    topRisks: [...risks].sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0)).slice(0, 3),
+    topRisks: [...openRisks].sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0)).slice(0, 3),
   };
 }
 
