@@ -346,15 +346,23 @@ export async function failRiskAgentRun(
   agentRunId: string,
   error: RiskScanError
 ) {
+  const outputSummary: RiskRunSummary = {
+    risks_created: 0,
+    rfis_created: 0,
+    topics_analyzed: 0,
+    skipped_topics: 0,
+    errors: [error.message],
+    ...error.summary,
+    code: error.code,
+  };
+
   const { error: updateError } = await supabase
     .from("agent_runs")
     .update({
       status: "failed",
       completed_at: new Date().toISOString(),
       error_message: error.message,
-      output_summary: error.summary
-        ? { ...error.summary, code: error.code }
-        : { code: error.code },
+      output_summary: outputSummary,
     })
     .eq("id", agentRunId);
 

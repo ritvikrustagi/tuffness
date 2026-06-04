@@ -3,6 +3,8 @@ import type { RiskFinding } from "./schema";
 import {
   buildRiskRunSummary,
   createRiskDedupeKey,
+  failRiskAgentRun,
+  RiskScanError,
   type RiskTopicError,
 } from "./runner";
 
@@ -84,6 +86,42 @@ describe("risk scan runner helpers", () => {
       skipped_topics: 0,
       errors: ["Doors: unsupported evidence for Door rating mismatch"],
       code: "validation_failed",
+    });
+  });
+
+  test("failRiskAgentRun writes default summary shape for plain scan errors", async () => {
+    let patch: Record<string, unknown> | null = null;
+    const supabase = {
+      from: (table: string) => {
+        expect(table).toBe("agent_runs");
+        return {
+          update: (value: Record<string, unknown>) => {
+            patch = value;
+            return {
+              eq: async (column: string, value: string) => {
+                expect(column).toBe("id");
+                expect(value).toBe("run-1");
+                return { error: null };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    await failRiskAgentRun(
+      supabase as never,
+      "run-1",
+      new RiskScanError("No processed documents available for this project.", "no_documents")
+    );
+
+    expect(patch?.output_summary).toEqual({
+      risks_created: 0,
+      rfis_created: 0,
+      topics_analyzed: 0,
+      skipped_topics: 0,
+      errors: ["No processed documents available for this project."],
+      code: "no_documents",
     });
   });
 });
