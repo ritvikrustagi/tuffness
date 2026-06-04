@@ -18,6 +18,7 @@ export function ProjectTabs({
     { href: base, label: "Overview", exact: true },
     { href: `${base}/documents`, label: "Documents", exact: false },
     { href: `${base}/chat`, label: "Chat", exact: false },
+    { href: `${base}/risks`, label: "Risks", exact: false },
     { href: `${base}/issues`, label: "RFIs", exact: false },
     { href: `${base}/submittals`, label: "Submittals", exact: false },
   ];
