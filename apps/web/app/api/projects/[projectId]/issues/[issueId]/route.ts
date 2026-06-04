@@ -40,6 +40,13 @@ const hasRiskMetadataPatch = (patch: RiskMetadataPatch) =>
 const hasWorkflowPatch = (patch: WorkflowPatch) =>
   Object.values(patch).some((value) => value !== undefined);
 
+const isValidDateString = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ projectId: string; issueId: string }> }
@@ -108,6 +115,13 @@ export async function PATCH(
 
   if (workflowPatch.rfi_status && workflowPatch.rfi_status !== derivedStatuses.rfi_status) {
     return NextResponse.json({ error: "rfi_status must match workflow_state" }, { status: 400 });
+  }
+
+  if (workflowPatch.due_date && !isValidDateString(workflowPatch.due_date)) {
+    return NextResponse.json(
+      { error: "due_date must be a valid YYYY-MM-DD date" },
+      { status: 400 }
+    );
   }
 
   if (hasRiskPatch) {
