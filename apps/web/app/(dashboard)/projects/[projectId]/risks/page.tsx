@@ -11,13 +11,15 @@ export default async function ProjectRisksPage({
   const { projectId } = await params;
   const supabase = await createClient();
 
-  const { data: risks } = await supabase
+  const { data: risks, error } = await supabase
     .from("issues")
     .select("*, rfis(*)")
     .eq("project_id", projectId)
     .not("risk_tier", "is", null)
     .order("risk_score", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
 
   const typedRisks = (risks ?? []) as Issue[];
 

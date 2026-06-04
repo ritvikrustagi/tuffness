@@ -52,8 +52,10 @@ export function RiskRegister({ projectId, risks }: { projectId: string; risks: I
 
     link.href = url;
     link.download = "risk-register.csv";
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   return (

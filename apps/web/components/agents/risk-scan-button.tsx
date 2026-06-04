@@ -17,6 +17,11 @@ export function RiskScanButton({ projectId }: { projectId: string }) {
 
       const res = await fetch(`/api/projects/${projectId}/agent-runs/${runId}`);
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to check risk scan status");
+      }
+
       const run = data.agent_run;
 
       if (!run) continue;
@@ -79,9 +84,19 @@ export function RiskScanButton({ projectId }: { projectId: string }) {
         {loading ? "Scanning..." : "Scan Risks"}
       </Button>
       {status && !error && (
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{status}</p>
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-2 text-sm text-zinc-600 dark:text-zinc-400"
+        >
+          {status}
+        </p>
       )}
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
