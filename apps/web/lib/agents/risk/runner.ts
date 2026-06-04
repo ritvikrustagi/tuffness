@@ -9,12 +9,21 @@ import type { IssueType } from "@/lib/types/database";
 
 const MAX_RISKS_PER_RUN = 10;
 
-type RiskFailureCode = "llm_timeout" | "invalid_json" | "validation_failed";
+export type RiskFailureCode = "llm_timeout" | "invalid_json" | "validation_failed";
 
-interface RiskTopicError {
+export interface RiskTopicError {
   topicLabel: string;
   message: string;
   code: RiskFailureCode;
+}
+
+export interface RiskRunSummary {
+  risks_created: number;
+  rfis_created: number;
+  topics_analyzed: number;
+  skipped_topics: number;
+  errors: string[];
+  code?: RiskScanError["code"];
 }
 
 export class RiskScanError extends Error {
@@ -26,7 +35,8 @@ export class RiskScanError extends Error {
       | "llm_timeout"
       | "invalid_json"
       | "validation_failed"
-      | "db_error"
+      | "db_error",
+    public readonly summary?: RiskRunSummary
   ) {
     super(message);
     this.name = "RiskScanError";
@@ -79,14 +89,21 @@ function riskEvidenceSupported(risk: RiskFinding, chunks: MatchedChunk[]) {
   return risk.evidence.every((evidence) => evidenceItemSupported(evidence, chunks));
 }
 
-function riskDedupeKey(risk: RiskFinding) {
-  const firstEvidence = risk.evidence[0];
+export function createRiskDedupeKey(risk: RiskFinding) {
+  const evidenceKeys = risk.evidence
+    .map((evidence) =>
+      [
+        evidence.document_id,
+        evidence.page_number,
+        normalizeForMatch(evidence.quote),
+      ].join(":")
+    )
+    .sort();
+
   return [
     normalizeForMatch(risk.risk_category),
     normalizeForMatch(risk.summary),
-    firstEvidence.document_id,
-    firstEvidence.page_number,
-    normalizeForMatch(firstEvidence.quote),
+    evidenceKeys.join("||"),
   ].join("|");
 }
 
@@ -100,6 +117,24 @@ function finalFailureCode(errors: RiskTopicError[]): RiskFailureCode {
     return "validation_failed";
   }
   return "invalid_json";
+}
+
+export function buildRiskRunSummary(params: {
+  risksCreated: number;
+  rfisCreated: number;
+  topicsAnalyzed: number;
+  skippedTopics: number;
+  errors: RiskTopicError[];
+  code?: RiskScanError["code"];
+}): RiskRunSummary {
+  return {
+    risks_created: params.risksCreated,
+    rfis_created: params.rfisCreated,
+    topics_analyzed: params.topicsAnalyzed,
+    skipped_topics: params.skippedTopics,
+    errors: summarizeErrors(params.errors),
+    ...(params.code ? { code: params.code } : {}),
+  };
 }
 
 async function persistRiskFinding(
@@ -236,7 +271,7 @@ export async function runRiskScan(params: {
           continue;
         }
 
-        const dedupeKey = riskDedupeKey(risk);
+        const dedupeKey = createRiskDedupeKey(risk);
         if (riskKeys.has(dedupeKey)) {
           continue;
         }
@@ -267,22 +302,34 @@ export async function runRiskScan(params: {
   }
 
   if (risksCreated === 0 && errors.length >= topicsAnalyzed && topicsAnalyzed > 0) {
+    const code = finalFailureCode(errors);
+    const summary = buildRiskRunSummary({
+      risksCreated,
+      rfisCreated,
+      topicsAnalyzed,
+      skippedTopics,
+      errors,
+      code,
+    });
     throw new RiskScanError(
-      summarizeErrors(errors)[0] ?? "All topic analyses failed",
-      finalFailureCode(errors)
+      summary.errors[0] ?? "All topic analyses failed",
+      code,
+      summary
     );
   }
+
+  const summary = buildRiskRunSummary({
+    risksCreated,
+    rfisCreated,
+    topicsAnalyzed,
+    skippedTopics,
+    errors,
+  });
 
   await updateAgentRun(supabase, agentRunId, {
     status: "completed",
     completed_at: new Date().toISOString(),
-    output_summary: {
-      risks_created: risksCreated,
-      rfis_created: rfisCreated,
-      topics_analyzed: topicsAnalyzed,
-      skipped_topics: skippedTopics,
-      errors: summarizeErrors(errors),
-    },
+    output_summary: summary,
   });
 
   return {
@@ -290,7 +337,7 @@ export async function runRiskScan(params: {
     rfisCreated,
     topicsAnalyzed,
     skippedTopics,
-    errors: summarizeErrors(errors),
+    errors: summary.errors,
   };
 }
 
@@ -305,7 +352,9 @@ export async function failRiskAgentRun(
       status: "failed",
       completed_at: new Date().toISOString(),
       error_message: error.message,
-      output_summary: { code: error.code },
+      output_summary: error.summary
+        ? { ...error.summary, code: error.code }
+        : { code: error.code },
     })
     .eq("id", agentRunId);
 
