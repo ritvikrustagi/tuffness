@@ -4,6 +4,7 @@ import { requireProjectAccess } from "@/lib/api/auth";
 import {
   buildIssueWorkflowRpcPatch,
   deriveWorkflowState,
+  getWorkflowStatuses,
   type IssueWorkflowState,
   isWorkflowTransitionAllowed,
   issueStatuses,
@@ -98,6 +99,17 @@ export async function PATCH(
     );
   }
 
+  const nextWorkflowState: IssueWorkflowState = workflowPatch.workflow_state ?? currentWorkflowState;
+  const derivedStatuses = getWorkflowStatuses(nextWorkflowState);
+
+  if (workflowPatch.status && workflowPatch.status !== derivedStatuses.status) {
+    return NextResponse.json({ error: "status must match workflow_state" }, { status: 400 });
+  }
+
+  if (workflowPatch.rfi_status && workflowPatch.rfi_status !== derivedStatuses.rfi_status) {
+    return NextResponse.json({ error: "rfi_status must match workflow_state" }, { status: 400 });
+  }
+
   if (hasRiskPatch) {
     const { error: riskUpdateError } = await supabase
       .from("issues")
@@ -115,14 +127,13 @@ export async function PATCH(
   }
 
   if (hasWorkflowFields) {
-    const workflowState: IssueWorkflowState = workflowPatch.workflow_state ?? currentWorkflowState;
     const { error: saveError } = await supabase.rpc("save_issue_workflow", {
       p_project_id: projectId,
       p_issue_id: issueId,
       p_user_id: user.id,
       p_patch: buildIssueWorkflowRpcPatch({
         ...workflowPatch,
-        workflow_state: workflowState,
+        workflow_state: nextWorkflowState,
       }),
     });
 
