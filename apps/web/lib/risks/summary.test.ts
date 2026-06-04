@@ -65,7 +65,7 @@ const sampleRisks = [
     evidence: [],
   },
   {
-    id: "reviewed:risk-4",
+    id: "risk-4",
     summary: "Reviewed owner approval",
     status: "acknowledged",
     risk_tier: "medium",
@@ -80,6 +80,7 @@ const sampleRisks = [
     required_artifact: "owner_approval",
     confidence: 0.65,
     recommended_action: "Track owner approval.",
+    human_reviewed_at: "2026-06-03T12:00:00.000Z",
     evidence: [],
   },
 ] satisfies RiskLike[];

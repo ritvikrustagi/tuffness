@@ -5,6 +5,12 @@ import {
 } from "@/lib/agents/risk/schema";
 import { formatChunksForPrompt, type ConstructionTopic } from "@/lib/agents/rfi/topics";
 import type { MatchedChunk } from "@/lib/rag/types";
+import {
+  complianceImpacts,
+  impactLevels,
+  requiredArtifacts,
+  riskCategories,
+} from "@/lib/risks/types";
 
 const LLM_TIMEOUT_MS = 45_000;
 
@@ -30,16 +36,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-export async function analyzeRiskTopicGroup(
-  topic: ConstructionTopic,
-  chunks: MatchedChunk[]
-): Promise<RiskAgentOutput> {
-  const openai = getOpenAIClient();
-  const context = formatChunksForPrompt(chunks);
+export function buildRiskSystemPrompt(topicLabel: string) {
+  return `You are a senior construction professional engineer assisting a project team with an AI risk register scan.
 
-  const systemPrompt = `You are a senior construction professional engineer assisting a project team with an AI risk register scan.
-
-Analyze the document excerpts for the topic: ${topic.label}.
+Analyze the document excerpts for the topic: ${topicLabel}.
 
 Look ONLY for evidence-backed construction risks that could affect:
 - cost exposure
@@ -55,17 +55,26 @@ Rules:
 3. If no credible risk exists for this topic, return {"risks": []}.
 4. Every risk must cite evidence with exact document_id, document_name, page_number, and a direct quote from the excerpts.
 5. Do not provide legal advice, code compliance certification, or a guarantee of compliance. Flag possible compliance risk only for human professional review.
-6. risk_category must be one of: drawing_spec_conflict, missing_information, coordination_conflict, submittal_requirement, possible_spec_deviation, owner_design_approval, schedule_constraint, cost_exposure, closeout_risk, other.
+6. risk_category must be one of: ${riskCategories.join(", ")}.
 7. severity must be low, medium, high, or critical.
-8. cost_impact and schedule_impact must be one of: none, low, medium, high, critical.
-9. compliance_impact must be one of: none, possible_noncompliance, spec_deviation, code_or_life_safety, submittal_required, owner_approval_required, inspection_or_testing_required, closeout_required.
-10. required_artifact must be one of: none, rfi, submittal, test_report, owner_approval, inspection, closeout_document.
+8. cost_impact and schedule_impact must be one of: ${impactLevels.join(", ")}.
+9. compliance_impact must be one of: ${complianceImpacts.join(", ")}.
+10. required_artifact must be one of: ${requiredArtifacts.join(", ")}.
 11. confidence must be a number from 0 to 1 based only on the strength of cited evidence.
 12. evidence_strength must be weak, moderate, or strong.
 13. If required_artifact is rfi, draft_rfi must be included as a formal RFI question ready for human review.
 14. If draft_rfi is included, required_artifact must be rfi.
 15. Do not invent responsible party, trade, spec section, drawing sheet, blocked activity, cost, schedule, or compliance details not visible in the excerpts.
 16. Maximum 5 risks per topic.`;
+}
+
+export async function analyzeRiskTopicGroup(
+  topic: ConstructionTopic,
+  chunks: MatchedChunk[]
+): Promise<RiskAgentOutput> {
+  const openai = getOpenAIClient();
+  const context = formatChunksForPrompt(chunks);
+  const systemPrompt = buildRiskSystemPrompt(topic.label);
 
   const userPrompt = `Topic: ${topic.label}
 

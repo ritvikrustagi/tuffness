@@ -1,21 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RiskAnalysisError, analyzeRiskTopicGroup } from "@/lib/agents/risk/analyze";
 import type { RiskFinding } from "@/lib/agents/risk/schema";
+import {
+  createRiskDedupeKey,
+  selectPersistableRiskFindings,
+  type RiskFailureCode,
+  type RiskTopicError,
+} from "@/lib/agents/risk/selection";
 import { retrieveTopicChunkGroups } from "@/lib/agents/rfi/topics";
 import { normalizeIssueEvidence } from "@/lib/issues/workflow";
-import type { MatchedChunk } from "@/lib/rag/types";
 import { calculateRiskScore } from "@/lib/risks/scoring";
 import type { IssueType } from "@/lib/types/database";
 
 const MAX_RISKS_PER_RUN = 10;
-
-export type RiskFailureCode = "llm_timeout" | "invalid_json" | "validation_failed";
-
-export interface RiskTopicError {
-  topicLabel: string;
-  message: string;
-  code: RiskFailureCode;
-}
+export { createRiskDedupeKey };
+export type { RiskFailureCode, RiskTopicError };
 
 export interface RiskRunSummary {
   risks_created: number;
@@ -65,46 +64,6 @@ function mapRiskCategoryToIssueType(risk: RiskFinding): IssueType {
   if (risk.risk_category === "missing_information") return "missing_info";
   if (risk.risk_category === "coordination_conflict") return "coordination";
   return "other";
-}
-
-function normalizeForMatch(value: string) {
-  return value.replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-function evidenceItemSupported(
-  evidence: RiskFinding["evidence"][number],
-  chunks: MatchedChunk[]
-) {
-  const quote = normalizeForMatch(evidence.quote);
-  if (!quote) return false;
-
-  return chunks.some((chunk) => {
-    if (chunk.document_id !== evidence.document_id) return false;
-    if (chunk.page_number !== evidence.page_number) return false;
-    return normalizeForMatch(chunk.content).includes(quote);
-  });
-}
-
-function riskEvidenceSupported(risk: RiskFinding, chunks: MatchedChunk[]) {
-  return risk.evidence.every((evidence) => evidenceItemSupported(evidence, chunks));
-}
-
-export function createRiskDedupeKey(risk: RiskFinding) {
-  const evidenceKeys = risk.evidence
-    .map((evidence) =>
-      [
-        evidence.document_id,
-        evidence.page_number,
-        normalizeForMatch(evidence.quote),
-      ].join(":")
-    )
-    .sort();
-
-  return [
-    normalizeForMatch(risk.risk_category),
-    normalizeForMatch(risk.summary),
-    evidenceKeys.join("||"),
-  ].join("|");
 }
 
 function summarizeErrors(errors: RiskTopicError[]) {
@@ -252,31 +211,20 @@ export async function runRiskScan(params: {
         continue;
       }
 
-      for (const risk of output.risks) {
-        if (risksCreated >= MAX_RISKS_PER_RUN) {
-          errors.push({
-            topicLabel: group.topic.label,
-            message: `risk cap reached; skipped remaining findings after ${MAX_RISKS_PER_RUN} risks`,
-            code: "validation_failed",
-          });
-          break;
-        }
-
-        if (!riskEvidenceSupported(risk, group.chunks)) {
-          errors.push({
-            topicLabel: group.topic.label,
-            message: `unsupported evidence for ${risk.summary}`,
-            code: "validation_failed",
-          });
-          continue;
-        }
-
-        const dedupeKey = createRiskDedupeKey(risk);
-        if (riskKeys.has(dedupeKey)) {
-          continue;
-        }
+      const selected = selectPersistableRiskFindings({
+        topicLabel: group.topic.label,
+        chunks: group.chunks,
+        risks: output.risks,
+        riskKeys,
+        remainingSlots: MAX_RISKS_PER_RUN - risksCreated,
+        maxRisksPerRun: MAX_RISKS_PER_RUN,
+      });
+      errors.push(...selected.errors);
+      for (const dedupeKey of selected.dedupeKeys) {
         riskKeys.add(dedupeKey);
+      }
 
+      for (const risk of selected.risks) {
         const result = await persistRiskFinding(supabase, {
           projectId,
           organizationId,

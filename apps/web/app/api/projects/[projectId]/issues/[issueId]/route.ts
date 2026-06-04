@@ -11,6 +11,7 @@ import {
   issueWorkflowStates,
   rfiStatuses,
 } from "@/lib/issues/workflow";
+import { buildRiskMetadataRpcPatch } from "@/lib/risks/patch";
 import { riskMetadataPatchSchema, type RiskMetadataPatch } from "@/lib/risks/validation";
 
 const workflowUpdateSchema = z.object({
@@ -124,36 +125,28 @@ export async function PATCH(
     );
   }
 
-  if (hasRiskPatch) {
-    const { error: riskUpdateError } = await supabase
-      .from("issues")
-      .update({
-        ...riskPatch,
-        human_reviewed_at: new Date().toISOString(),
-        human_reviewed_by: user.id,
+  const workflowRpcPatch = buildIssueWorkflowRpcPatch({
+    ...workflowPatch,
+    workflow_state: nextWorkflowState,
+  });
+
+  const { error: saveError } = hasRiskPatch
+    ? await supabase.rpc("save_issue_with_risk_metadata", {
+        p_project_id: projectId,
+        p_issue_id: issueId,
+        p_user_id: user.id,
+        p_workflow_patch: workflowRpcPatch,
+        p_risk_patch: buildRiskMetadataRpcPatch(riskPatch),
       })
-      .eq("id", issueId)
-      .eq("project_id", projectId);
+    : await supabase.rpc("save_issue_workflow", {
+        p_project_id: projectId,
+        p_issue_id: issueId,
+        p_user_id: user.id,
+        p_patch: workflowRpcPatch,
+      });
 
-    if (riskUpdateError) {
-      return NextResponse.json({ error: riskUpdateError.message }, { status: 500 });
-    }
-  }
-
-  if (hasWorkflowFields) {
-    const { error: saveError } = await supabase.rpc("save_issue_workflow", {
-      p_project_id: projectId,
-      p_issue_id: issueId,
-      p_user_id: user.id,
-      p_patch: buildIssueWorkflowRpcPatch({
-        ...workflowPatch,
-        workflow_state: nextWorkflowState,
-      }),
-    });
-
-    if (saveError) {
-      return NextResponse.json({ error: saveError.message }, { status: 500 });
-    }
+  if (saveError) {
+    return NextResponse.json({ error: saveError.message }, { status: 500 });
   }
 
   const { data: issue, error } = await supabase

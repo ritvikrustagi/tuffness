@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { RiskFinding } from "./schema";
+import type { MatchedChunk } from "@/lib/rag/types";
 import {
   buildRiskRunSummary,
   createRiskDedupeKey,
@@ -7,6 +8,7 @@ import {
   RiskScanError,
   type RiskTopicError,
 } from "./runner";
+import { selectPersistableRiskFindings } from "./selection";
 
 const baseRisk: RiskFinding = {
   risk_category: "possible_spec_deviation",
@@ -87,6 +89,56 @@ describe("risk scan runner helpers", () => {
       errors: ["Doors: unsupported evidence for Door rating mismatch"],
       code: "validation_failed",
     });
+  });
+
+  test("selectPersistableRiskFindings filters unsupported evidence, dedupes, and enforces cap", () => {
+    const riskKeys = new Set<string>();
+    const chunks = [
+      {
+        id: "chunk-1",
+        document_id: "11111111-1111-4111-8111-111111111111",
+        document_page_id: "page-1",
+        document_name: "Drawings",
+        page_number: 4,
+        content: "Door 101 rating not indicated",
+        content_type: "text",
+        metadata: {},
+        similarity: 0.9,
+        sheet_number: null,
+        sheet_title: null,
+      },
+    ] satisfies MatchedChunk[];
+
+    const duplicateRisk = { ...baseRisk, evidence: [baseRisk.evidence[0]] };
+    const unsupportedRisk = {
+      ...baseRisk,
+      summary: "Unsupported claim",
+      evidence: [
+        {
+          ...baseRisk.evidence[0],
+          quote: "This quote is not in the chunk",
+        },
+      ],
+    };
+
+    const result = selectPersistableRiskFindings({
+      topicLabel: "Doors",
+      chunks,
+      risks: [duplicateRisk, duplicateRisk, unsupportedRisk],
+      riskKeys,
+      remainingSlots: 1,
+    });
+
+    expect(result.risks).toEqual([duplicateRisk]);
+    expect(riskKeys.size).toBe(0);
+    expect(result.dedupeKeys).toEqual([createRiskDedupeKey(duplicateRisk)]);
+    expect(result.errors).toEqual([
+      {
+        topicLabel: "Doors",
+        message: "risk cap reached; skipped remaining findings after 1 risks",
+        code: "validation_failed",
+      },
+    ]);
   });
 
   test("failRiskAgentRun writes default summary shape for plain scan errors", async () => {

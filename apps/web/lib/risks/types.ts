@@ -67,5 +67,6 @@ export type RiskLike = {
   required_artifact?: RequiredArtifact | null;
   confidence?: number | null;
   recommended_action?: string | null;
+  human_reviewed_at?: string | null;
   evidence?: RiskEvidence[] | null;
 };

@@ -39,3 +39,6 @@ export const riskMetadataPatchSchema = z.object({
 });
 
 export type RiskMetadataPatch = z.infer<typeof riskMetadataPatchSchema>;
+export const riskMetadataPatchFields = Object.keys(
+  riskMetadataPatchSchema.shape
+) as (keyof RiskMetadataPatch)[];

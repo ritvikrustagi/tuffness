@@ -28,7 +28,7 @@ export function summarizeRisks(risks: RiskLike[]): RiskSummary {
 
       summary.open += 1;
 
-      if (!risk.id?.startsWith("reviewed:")) {
+      if (!risk.human_reviewed_at) {
         summary.awaiting_review += 1;
       }
 

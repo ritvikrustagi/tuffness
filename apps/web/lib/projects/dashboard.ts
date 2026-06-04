@@ -123,10 +123,6 @@ export function buildProjectDashboard<
   TAgentRun
 > {
   const risks = issues.filter((issue) => issue.risk_tier);
-  const riskSummaryInput = risks.map((risk) => ({
-    ...risk,
-    id: risk.human_reviewed_at ? `reviewed:${risk.id ?? ""}` : risk.id,
-  }));
   const openRisks = risks.filter((risk) => !isClosedRisk(risk));
 
   return {
@@ -138,7 +134,7 @@ export function buildProjectDashboard<
     documentSummary: summarizeDocuments(documents),
     issueSummary: summarizeIssueWorkflows(issues),
     submittalSummary: summarizeSubmittals(submittals),
-    riskSummary: summarizeRisks(riskSummaryInput),
+    riskSummary: summarizeRisks(risks),
     recentDocuments: documents.slice(0, 3),
     recentIssues: issues.slice(0, 3),
     recentSubmittals: submittals.slice(0, 3),
