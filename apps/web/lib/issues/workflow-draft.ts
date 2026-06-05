@@ -165,6 +165,14 @@ export function buildIssueWorkflowRpcPatch(input: {
   return patch;
 }
 
+export function buildOptionalIssueWorkflowRpcPatch(input: Parameters<typeof buildIssueWorkflowRpcPatch>[0] & {
+  hasWorkflowFields: boolean;
+}): Record<string, string | null> {
+  if (!input.hasWorkflowFields) return {};
+
+  return buildIssueWorkflowRpcPatch(input);
+}
+
 export function formatOptionalLine(
   label: string,
   value: string | null | undefined

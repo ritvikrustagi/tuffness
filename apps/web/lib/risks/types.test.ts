@@ -68,7 +68,7 @@ describe("risk taxonomy", () => {
     const migration = readFileSync(
       resolve(
         process.cwd(),
-        "../../supabase/migrations/010_save_issue_workflow_risk_metadata.sql"
+        "../../supabase/migrations/011_guard_metadata_only_workflow_updates.sql"
       ),
       "utf8"
     );
@@ -79,6 +79,7 @@ describe("risk taxonomy", () => {
     expect(migration).not.toContain(
       "CREATE OR REPLACE FUNCTION public.save_issue_workflow("
     );
+    expect(migration).toContain("IF p_workflow_patch <> '{}'::JSONB THEN");
     expect(migration).toContain("PERFORM public.save_issue_workflow(");
     expect(parseSqlTextArray(migration, "p_risk_patch ?|")).toEqual([
       ...riskMetadataPatchFields,

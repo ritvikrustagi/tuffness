@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProjectAccess } from "@/lib/api/auth";
 import {
-  buildIssueWorkflowRpcPatch,
+  buildOptionalIssueWorkflowRpcPatch,
   deriveWorkflowState,
   getWorkflowStatuses,
   type IssueWorkflowState,
@@ -125,7 +125,8 @@ export async function PATCH(
     );
   }
 
-  const workflowRpcPatch = buildIssueWorkflowRpcPatch({
+  const workflowRpcPatch = buildOptionalIssueWorkflowRpcPatch({
+    hasWorkflowFields,
     ...workflowPatch,
     workflow_state: nextWorkflowState,
   });
