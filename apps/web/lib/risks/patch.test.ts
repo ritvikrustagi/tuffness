@@ -24,4 +24,10 @@ describe("risk metadata patch", () => {
       risk_reasoning: "Spec section and drawing note conflict.",
     });
   });
+
+  test("includes an explicit reviewed flag in the RPC patch", () => {
+    const parsed = riskMetadataPatchSchema.parse({ reviewed: true });
+
+    expect(buildRiskMetadataRpcPatch(parsed)).toEqual({ reviewed: true });
+  });
 });

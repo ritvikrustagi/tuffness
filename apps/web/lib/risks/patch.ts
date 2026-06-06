@@ -12,8 +12,8 @@ function cleanOptionalText(value: string | null | undefined): string | null | un
 
 export function buildRiskMetadataRpcPatch(
   input: RiskMetadataPatch
-): Record<string, string | number | null> {
-  const patch: Record<string, string | number | null> = {};
+): Record<string, string | number | boolean | null> {
+  const patch: Record<string, string | number | boolean | null> = {};
 
   for (const field of riskMetadataPatchFields) {
     const value = input[field];

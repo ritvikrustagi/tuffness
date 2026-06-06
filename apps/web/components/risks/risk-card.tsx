@@ -1,6 +1,7 @@
 "use client";
 
 import { Clipboard } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import type { Issue } from "@/lib/types/database";
 import { SourceViewer } from "@/components/documents/source-viewer";
@@ -121,17 +122,26 @@ export function RiskCard({ projectId, risk }: { projectId: string; risk: Issue }
 
       {complianceRisk && (
         <div className="mt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={copyCompliancePacket}
-            className="gap-2"
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={copyCompliancePacket}
+          className="gap-2"
           >
             <Clipboard className="h-4 w-4" />
             {copied ? "Copied" : "Copy compliance packet"}
           </Button>
         </div>
       )}
+
+      <div className="mt-4">
+        <Link
+          href={`/projects/${projectId}/risks/${risk.id}`}
+          className="inline-flex items-center justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-700"
+        >
+          Open detail
+        </Link>
+      </div>
 
       {evidence.length > 0 && (
         <div className="mt-4">

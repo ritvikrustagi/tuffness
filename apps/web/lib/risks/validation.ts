@@ -36,6 +36,7 @@ export const riskMetadataPatchSchema = z.object({
     emptyStringToNull,
     z.enum(["weak", "moderate", "strong"]).nullable().optional()
   ),
+  reviewed: z.literal(true).optional(),
 });
 
 export type RiskMetadataPatch = z.infer<typeof riskMetadataPatchSchema>;

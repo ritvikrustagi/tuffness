@@ -68,7 +68,7 @@ describe("risk taxonomy", () => {
     const migration = readFileSync(
       resolve(
         process.cwd(),
-        "../../supabase/migrations/011_guard_metadata_only_workflow_updates.sql"
+        "../../supabase/migrations/012_explicit_risk_review_flag.sql"
       ),
       "utf8"
     );
