@@ -68,14 +68,12 @@ describe("risk taxonomy", () => {
     const migration = readFileSync(
       resolve(
         process.cwd(),
-        "../../supabase/migrations/012_explicit_risk_review_flag.sql"
+        "../../supabase/migrations/013_separate_risk_review_command.sql"
       ),
       "utf8"
     );
 
-    expect(migration).toContain(
-      "CREATE OR REPLACE FUNCTION public.save_issue_with_risk_metadata"
-    );
+    expect(migration).toContain("p_mark_reviewed BOOLEAN DEFAULT false");
     expect(migration).not.toContain(
       "CREATE OR REPLACE FUNCTION public.save_issue_workflow("
     );
@@ -84,5 +82,6 @@ describe("risk taxonomy", () => {
     expect(parseSqlTextArray(migration, "p_risk_patch ?|")).toEqual([
       ...riskMetadataPatchFields,
     ]);
+    expect(parseSqlTextArray(migration, "p_risk_patch ?|")).not.toContain("reviewed");
   });
 });

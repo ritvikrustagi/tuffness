@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Issue } from "@/lib/types/database";
 import {
+  buildDraftRfiDownloadName,
   buildDraftRfiExportText,
   buildIssueWorkflowPatch,
   getInitialIssueWorkflowDraft,
@@ -93,9 +94,8 @@ export function IssueList({ projectId, issues }: { projectId: string; issues: Is
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const safeSubject = issue.summary.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     link.href = url;
-    link.download = `${safeSubject || "draft-rfi"}.txt`;
+    link.download = buildDraftRfiDownloadName(issue.summary);
     link.click();
     URL.revokeObjectURL(url);
     setMessage("Draft RFI exported.");

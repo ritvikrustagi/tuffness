@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
+  buildDraftRfiDownloadName,
   buildDraftRfiExportText,
   buildIssueWorkflowPatch,
   deriveWorkflowState,
@@ -233,6 +234,13 @@ describe("RFI issue workflow", () => {
     expect(text).toContain("Evidence:\n1. A601 Door Schedule, page 12: Door 101 hardware set is omitted.");
     expect(text).toContain("External RFI Number: RFI-042");
     expect(text).not.toContain("undefined");
+  });
+
+  test("builds stable draft RFI download filenames", () => {
+    expect(buildDraftRfiDownloadName(" Door / Hardware Conflict ")).toBe(
+      "door-hardware-conflict.txt"
+    );
+    expect(buildDraftRfiDownloadName("!!!")).toBe("draft-rfi.txt");
   });
 
   test("matches the workflow states and transitions enforced by the SQL migration", () => {

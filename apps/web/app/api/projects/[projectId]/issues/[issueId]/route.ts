@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { requireProjectAccess } from "@/lib/api/auth";
 import {
   buildOptionalIssueWorkflowRpcPatch,
@@ -7,39 +6,11 @@ import {
   getWorkflowStatuses,
   type IssueWorkflowState,
   isWorkflowTransitionAllowed,
-  issueStatuses,
-  issueWorkflowStates,
-  rfiStatuses,
 } from "@/lib/issues/workflow";
+import {
+  safeParseIssueUpdateRequest,
+} from "@/lib/issues/update-request";
 import { buildRiskMetadataRpcPatch } from "@/lib/risks/patch";
-import { riskMetadataPatchSchema, type RiskMetadataPatch } from "@/lib/risks/validation";
-
-const workflowUpdateSchema = z.object({
-  workflow_state: z.enum(issueWorkflowStates).optional(),
-  status: z.enum(issueStatuses).optional(),
-  rfi_status: z.enum(rfiStatuses).optional(),
-  subject: z.string().max(200).nullable().optional(),
-  resolution_notes: z.string().max(4000).nullable().optional(),
-  description: z.string().max(4000).nullable().optional(),
-  trade: z.string().max(100).nullable().optional(),
-  discipline: z.string().max(100).nullable().optional(),
-  due_date: z.string().nullable().optional(),
-  external_system_url: z.string().max(1000).nullable().optional(),
-  draft_rfi: z.string().max(4000).nullable().optional(),
-  external_rfi_number: z.string().max(100).nullable().optional(),
-  external_url: z.string().max(1000).nullable().optional(),
-  response: z.string().max(4000).nullable().optional(),
-});
-
-const issueUpdateSchema = workflowUpdateSchema.extend(riskMetadataPatchSchema.shape);
-
-type WorkflowPatch = z.infer<typeof workflowUpdateSchema>;
-
-const hasRiskMetadataPatch = (patch: RiskMetadataPatch) =>
-  Object.values(patch).some((value) => value !== undefined);
-
-const hasWorkflowPatch = (patch: WorkflowPatch) =>
-  Object.values(patch).some((value) => value !== undefined);
 
 const isValidDateString = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -56,17 +27,22 @@ export async function PATCH(
   const { supabase, errorResponse, project, user } = await requireProjectAccess(projectId);
   if (errorResponse) return errorResponse;
 
-  const parsed = issueUpdateSchema.safeParse(await request.json());
+  const body = await request.json();
+  const parsed = safeParseIssueUpdateRequest(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
 
-  const riskPatch = riskMetadataPatchSchema.parse(parsed.data);
-  const workflowPatch = workflowUpdateSchema.parse(parsed.data);
-  const hasRiskPatch = hasRiskMetadataPatch(riskPatch);
-  const hasWorkflowFields = hasWorkflowPatch(workflowPatch);
+  const {
+    riskPatch,
+    workflowPatch,
+    hasRiskPatch,
+    markReviewed,
+    hasWorkflowFields,
+    hasAnyPatch,
+  } = parsed.data;
 
-  if (!hasRiskPatch && !hasWorkflowFields) {
+  if (!hasAnyPatch) {
     return NextResponse.json({ error: "No issue fields provided" }, { status: 400 });
   }
 
@@ -131,13 +107,14 @@ export async function PATCH(
     workflow_state: nextWorkflowState,
   });
 
-  const { error: saveError } = hasRiskPatch
+  const { error: saveError } = hasRiskPatch || markReviewed
     ? await supabase.rpc("save_issue_with_risk_metadata", {
         p_project_id: projectId,
         p_issue_id: issueId,
         p_user_id: user.id,
         p_workflow_patch: workflowRpcPatch,
         p_risk_patch: buildRiskMetadataRpcPatch(riskPatch),
+        p_mark_reviewed: markReviewed,
       })
     : await supabase.rpc("save_issue_workflow", {
         p_project_id: projectId,

@@ -25,9 +25,9 @@ describe("risk metadata patch", () => {
     });
   });
 
-  test("includes an explicit reviewed flag in the RPC patch", () => {
-    const parsed = riskMetadataPatchSchema.parse({ reviewed: true });
+  test("does not include review commands in metadata RPC patches", () => {
+    const parsed = riskMetadataPatchSchema.parse({ risk_reasoning: " Looks risky. " });
 
-    expect(buildRiskMetadataRpcPatch(parsed)).toEqual({ reviewed: true });
+    expect(buildRiskMetadataRpcPatch(parsed)).toEqual({ risk_reasoning: "Looks risky." });
   });
 });

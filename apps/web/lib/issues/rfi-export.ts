@@ -1,6 +1,11 @@
 import type { IssueEvidence } from "@/lib/types/database";
 import { formatOptionalLine, type IssueWorkflowDraft } from "./workflow-draft";
 
+export function buildDraftRfiDownloadName(summary: string): string {
+  const safeSubject = summary.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `${safeSubject || "draft-rfi"}.txt`;
+}
+
 export function buildDraftRfiExportText(input: {
   issue: {
     summary: string;

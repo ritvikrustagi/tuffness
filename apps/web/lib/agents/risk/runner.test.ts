@@ -3,6 +3,7 @@ import type { RiskFinding } from "./schema";
 import type { MatchedChunk } from "@/lib/rag/types";
 import { riskScanProfiles } from "./profile";
 import {
+  buildRiskIssueRpcParams,
   buildRiskRunSummary,
   createRiskDedupeKey,
   failRiskAgentRun,
@@ -40,6 +41,27 @@ const baseRisk: RiskFinding = {
 };
 
 describe("risk scan runner helpers", () => {
+  test("builds risk issue RPC params from a finding in one tested boundary", () => {
+    expect(
+      buildRiskIssueRpcParams({
+        projectId: "project-1",
+        organizationId: "org-1",
+        agentRunId: "run-1",
+        userId: "user-1",
+        risk: baseRisk,
+      })
+    ).toMatchObject({
+      p_project_id: "project-1",
+      p_organization_id: "org-1",
+      p_agent_run_id: "run-1",
+      p_user_id: "user-1",
+      p_issue_type: "other",
+      p_summary: "Door rating mismatch",
+      p_risk_reasoning: "Door schedule and specifications do not align.",
+      p_evidence_strength: "strong",
+    });
+  });
+
   test("dedupes by normalized full evidence set regardless of order", () => {
     const reorderedRisk = {
       ...baseRisk,

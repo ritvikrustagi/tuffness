@@ -124,6 +124,25 @@ async function persistRiskFinding(
     risk: RiskFinding;
   }
 ): Promise<{ rfiCreated: boolean }> {
+  const { error } = await supabase.rpc(
+    "create_risk_issue_with_optional_rfi",
+    buildRiskIssueRpcParams(params)
+  );
+
+  if (error) {
+    throw new RiskScanError(error.message, "db_error");
+  }
+
+  return { rfiCreated: params.risk.required_artifact === "rfi" };
+}
+
+export function buildRiskIssueRpcParams(params: {
+  projectId: string;
+  organizationId: string;
+  agentRunId: string;
+  userId: string;
+  risk: RiskFinding;
+}) {
   const evidence = normalizeIssueEvidence(params.risk.evidence);
   const { risk_score, risk_tier } = calculateRiskScore({
     severity: params.risk.severity,
@@ -134,7 +153,8 @@ async function persistRiskFinding(
     evidence_count: evidence.length,
     blocks_work: Boolean(params.risk.blocked_activity),
   });
-  const { error } = await supabase.rpc("create_risk_issue_with_optional_rfi", {
+
+  return {
     p_project_id: params.projectId,
     p_organization_id: params.organizationId,
     p_agent_run_id: params.agentRunId,
@@ -162,13 +182,7 @@ async function persistRiskFinding(
     p_blocked_activity: params.risk.blocked_activity ?? null,
     p_risk_reasoning: params.risk.description,
     p_evidence_strength: params.risk.evidence_strength,
-  });
-
-  if (error) {
-    throw new RiskScanError(error.message, "db_error");
-  }
-
-  return { rfiCreated: params.risk.required_artifact === "rfi" };
+  };
 }
 
 export async function runRiskScan(params: {

@@ -4,8 +4,8 @@ import {
   type IssueWorkflowState,
 } from "@/lib/issues/workflow";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { formatStatus } from "@/components/issues/issue-display";
+import { FormTextAreaField, FormTextField } from "@/components/ui/form-fields";
 
 function workflowStateOptions(state: IssueWorkflowState) {
   return [state, ...getAllowedWorkflowTransitions(state)];
@@ -16,58 +16,6 @@ function WorkflowSection({ title }: { title: string }) {
     <div className="mt-5 border-t border-zinc-200 pt-4 first:mt-4 dark:border-zinc-800">
       <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</h4>
     </div>
-  );
-}
-
-function TextField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  className = "",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-  className?: string;
-}) {
-  return (
-    <label className={`text-xs font-medium text-zinc-600 dark:text-zinc-400 ${className}`}>
-      {label}
-      <Input
-        className="mt-1"
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-    </label>
-  );
-}
-
-function TextAreaField({
-  label,
-  value,
-  onChange,
-  minHeightClass,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  minHeightClass: string;
-}) {
-  return (
-    <label className="mt-3 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-      {label}
-      <textarea
-        className={`mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-orange-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 ${minHeightClass}`}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
   );
 }
 
@@ -99,25 +47,25 @@ function WorkflowFields({
           </select>
         </label>
 
-        <TextField
+        <FormTextField
           label="Trade"
           value={draft.trade}
           onChange={(trade) => onChange({ trade })}
           placeholder="doors/hardware"
         />
-        <TextField
+        <FormTextField
           label="Discipline"
           value={draft.discipline}
           onChange={(discipline) => onChange({ discipline })}
           placeholder="architectural"
         />
-        <TextField
+        <FormTextField
           label="Due date"
           type="date"
           value={draft.due_date}
           onChange={(due_date) => onChange({ due_date })}
         />
-        <TextField
+        <FormTextField
           label="External RFI #"
           value={draft.external_rfi_number}
           onChange={(external_rfi_number) => onChange({ external_rfi_number })}
@@ -138,20 +86,20 @@ function DraftFields({
   return (
     <>
       <WorkflowSection title="RFI draft" />
-      <TextField
+      <FormTextField
         label="Subject"
         className="mt-3 block"
         value={draft.subject}
         onChange={(subject) => onChange({ subject })}
         placeholder="Door hardware conflict"
       />
-      <TextAreaField
+      <FormTextAreaField
         label="Question"
         minHeightClass="min-h-32"
         value={draft.draft_rfi}
         onChange={(draft_rfi) => onChange({ draft_rfi })}
       />
-      <TextAreaField
+      <FormTextAreaField
         label="Background / context"
         minHeightClass="min-h-24"
         value={draft.description}
@@ -172,13 +120,13 @@ function ExternalTrackingFields({
     <>
       <WorkflowSection title="External tracking" />
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <TextField
+        <FormTextField
           label="External RFI URL"
           value={draft.external_url}
           onChange={(external_url) => onChange({ external_url })}
           placeholder="https://"
         />
-        <TextField
+        <FormTextField
           label="External issue URL"
           value={draft.external_system_url}
           onChange={(external_system_url) => onChange({ external_system_url })}
@@ -199,13 +147,13 @@ function CloseoutFields({
   return (
     <>
       <WorkflowSection title="Closeout" />
-      <TextAreaField
+      <FormTextAreaField
         label="Response"
         minHeightClass="min-h-20"
         value={draft.response}
         onChange={(response) => onChange({ response })}
       />
-      <TextAreaField
+      <FormTextAreaField
         label="Resolution notes"
         minHeightClass="min-h-20"
         value={draft.resolution_notes}
