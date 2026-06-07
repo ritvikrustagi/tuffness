@@ -1,9 +1,10 @@
 "use client";
 
-import { Clipboard, ExternalLink } from "lucide-react";
+import { Clipboard, Download, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { IssueWorkflowForm } from "@/components/issues/issue-workflow-form";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { isComplianceRisk } from "@/lib/risks/compliance";
 import type { Issue } from "@/lib/types/database";
 import { RiskEvidencePanel } from "./risk-evidence-panel";
@@ -29,8 +30,10 @@ export function RiskDetailWorkspace({
     setWorkflowDraft,
     updateRiskDraft,
     copyCompliancePacket,
+    copyPacket,
     copyDraftRfi,
     exportDraftRfi,
+    exportPacket,
     saveMetadata,
     saveWorkflow,
     markReviewed,
@@ -47,14 +50,23 @@ export function RiskDetailWorkspace({
           Back to risk register
         </Link>
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button type="button" variant="secondary" onClick={copyPacket} className="gap-2">
+            <Clipboard className="h-4 w-4" />
+            Copy packet
+          </Button>
+          <Button type="button" variant="secondary" onClick={exportPacket} className="gap-2">
+            <Download className="h-4 w-4" />
+            Export packet
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             onClick={copyCompliancePacket}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            className="gap-2"
           >
             <Clipboard className="h-4 w-4" />
-            Copy compliance packet
-          </button>
+            Copy summary
+          </Button>
           {issue.external_system_url && (
             <a
               href={issue.external_system_url}

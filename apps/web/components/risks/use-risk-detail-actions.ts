@@ -15,6 +15,10 @@ import {
   buildRiskMetadataPayload,
   type RiskMetadataDraft,
 } from "@/lib/risks/detail-draft";
+import {
+  buildCompliancePacketDownloadName,
+  buildCompliancePacketText,
+} from "@/lib/risks/packet";
 import type { Issue } from "@/lib/types/database";
 
 export type RiskDetailSaveKind = "workflow" | "metadata" | "reviewed";
@@ -95,6 +99,14 @@ export function useRiskDetailActions({
     setError(null);
   }
 
+  async function copyPacket() {
+    await navigator.clipboard.writeText(
+      buildCompliancePacketText({ risk: issue, draftRfi: workflowDraft.draft_rfi })
+    );
+    setMessage("Packet copied.");
+    setError(null);
+  }
+
   async function copyDraftRfi() {
     if (!workflowDraft.draft_rfi) return;
     await navigator.clipboard.writeText(buildDraftRfiExportText({ issue, draft: workflowDraft }));
@@ -119,6 +131,22 @@ export function useRiskDetailActions({
     setError(null);
   }
 
+  function exportPacket() {
+    const blob = new Blob(
+      [buildCompliancePacketText({ risk: issue, draftRfi: workflowDraft.draft_rfi })],
+      { type: "text/plain;charset=utf-8" }
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = buildCompliancePacketDownloadName(issue.summary);
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage("Packet exported.");
+    setError(null);
+  }
+
   return {
     issue,
     workflowDraft,
@@ -129,8 +157,10 @@ export function useRiskDetailActions({
     setWorkflowDraft,
     updateRiskDraft,
     copyCompliancePacket,
+    copyPacket,
     copyDraftRfi,
     exportDraftRfi,
+    exportPacket,
     saveMetadata: () =>
       patchIssue("metadata", buildRiskMetadataPayload(riskDraft), "Risk metadata saved and reviewed."),
     saveWorkflow: () =>
