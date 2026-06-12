@@ -1,137 +1,70 @@
-# AI Project Engineer
+# Downloads to iCloud
 
-AI-native construction platform for RFI and Submittal Review.
+Moves new completed files from `~/Downloads` to iCloud Drive in the background on macOS.
 
-## Phase 1
+The watcher is intentionally conservative:
 
-- Next.js app with Supabase Auth (email/password)
-- Organization-based multi-tenancy
-- Projects CRUD
-- PDF document upload to Supabase Storage
+- The first scan records files already in `~/Downloads` and leaves them there.
+- Later scans move only newly seen completed files.
+- Browser temporary files such as `.crdownload`, `.download`, `.part`, `.partial`, and `.tmp` are ignored.
+- If a file with the same name already exists in iCloud Drive, the moved file gets a numbered name such as `report 2.pdf`.
 
-## Phase 5 (current)
+## Install
 
-- Controlled Submittal Review agent (spec vs submittal comparison)
-- Upload submittal PDFs, process via existing pipeline, review against spec chunks
-- Structured review results + linked issues for fail/high-severity items
-- Submittals tab at `/projects/:id/submittals`
+From a cloned copy of this repository:
 
-## Phase 4
-
-- Controlled RFI agent (deterministic retrieval + structured LLM output)
-- Creates draft issues + linked draft RFIs for human review
-- Issues tab at `/projects/:id/issues`
-
-## Phase 3
-
-- pgvector semantic search via `match_chunks()`
-- Project chat with streaming RAG answers and citations
-- Chat UI at `/projects/:id/chat`
-
-## Phase 2
-
-- FastAPI document processor (`apps/processor`)
-- pdfplumber text extraction + pymupdf page images
-- Sheet number/title detection, chunking, OpenAI embeddings
-- Chunks stored in Postgres with pgvector
-- Auto-processing triggered after upload
-
-## Prerequisites
-
-- Node.js 20+
-- Python 3.12+
-- A [Supabase](https://supabase.com) project
-- OpenAI API key (embeddings + chat)
-
-## Setup
-
-### 1. Apply database migrations
-
-Run in Supabase SQL Editor (in order):
-
-1. `supabase/migrations/001_initial_schema.sql`
-2. `supabase/migrations/002_storage.sql`
-3. `supabase/migrations/003_page_images_storage.sql`
-4. `supabase/migrations/004_rfi_agent_type.sql`
-5. `supabase/migrations/005_submittal_review.sql`
-
-### 2. Configure Supabase Auth
-
-- Enable **Email** provider
-- Site URL: `http://localhost:3000`
-- Redirect URL: `http://localhost:3000/auth/callback`
-
-### 3. Start the document processor
-
-```bash
-cd apps/processor
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, PROCESSOR_API_KEY
-uvicorn app.main:app --reload --port 8000
+```sh
+sh install.sh
 ```
 
-### 4. Start the web app
+The installer copies the watcher to `~/.local/bin/downloads-to-icloud.py`, generates a user-specific LaunchAgent at `~/Library/LaunchAgents/com.user.downloads-to-icloud.plist`, and starts it.
 
-```bash
-cd apps/web
-cp .env.local.example .env.local
-# Set Supabase keys + PROCESSOR_API_URL=http://localhost:8000 + PROCESSOR_API_KEY
-# Set OPENAI_API_KEY (+ optional OPENAI_CHAT_MODEL, OPENAI_EMBEDDING_MODEL)
-npm install
-npm run dev
+By default files move to:
+
+```text
+~/Library/Mobile Documents/com~apple~CloudDocs/Downloads
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+## macOS Privacy Permission
 
-## Chat flow (Phase 3)
+macOS may block background processes from reading `~/Downloads`. If the log says permission was denied, grant access:
 
-1. Upload and process PDFs (status `ready`)
-2. Open project → **Chat** tab
-3. Ask a question → query is embedded → pgvector retrieves top chunks
-4. LLM answers with inline citations `[1]`, `[2]` and source cards below
+1. Open System Settings.
+2. Go to Privacy & Security.
+3. Open Full Disk Access.
+4. Add `/usr/bin/python3`.
 
-## Vector search API
+You can jump to that path in the file picker with `Cmd+Shift+G`.
 
-Debug/search endpoint for retrieved chunks:
+## Commands
 
-```
-GET /api/projects/:projectId/search?q=door+hardware&limit=8&threshold=0.55
-```
+Check status:
 
-## Document processing flow
-
-1. User uploads PDF → stored in Supabase Storage
-2. Web app creates `documents` row (`pending`)
-3. Web app calls processor `POST /process/document`
-4. Processor sets status `processing` → extracts pages → embeds chunks → `ready`
-
-## Project structure
-
-```
-construction/
-├── apps/web/           # Next.js application
-├── apps/processor/     # FastAPI PDF ingestion worker
-├── supabase/migrations/
-├── tools/              # Local helper automations
-└── docs/
+```sh
+launchctl print gui/$(id -u)/com.user.downloads-to-icloud
 ```
 
-## Local automations
+Stop and remove the LaunchAgent:
 
-This repo includes a macOS helper that moves new completed files from `~/Downloads` to iCloud Drive in the background. See `tools/downloads_to_icloud/README.md` for install, uninstall, and troubleshooting steps.
+```sh
+sh uninstall.sh
+```
 
-## Submittal review flow (Phase 5)
+View logs:
 
-1. Upload spec PDFs on Documents tab (`document_type: spec`)
-2. Open Submittals tab → upload submittal PDF with category
-3. Wait for submittal processing (`ready`)
-4. Click **Review Against Specs**
-5. Review structured results — human approval required
+```sh
+tail -f ~/.local/state/downloads-to-icloud/out.log
+tail -f ~/.local/state/downloads-to-icloud/error.log
+```
 
-## Next phases
+Run one scan manually:
 
-All MVP phases complete. See `docs/TECHNICAL_DESIGN.md` for future enhancements.
+```sh
+python3 downloads_to_icloud.py --once
+```
 
-See `docs/TECHNICAL_DESIGN.md` for full architecture.
+## Test
+
+```sh
+python3 tests/test_downloads_to_icloud.py -v
+```

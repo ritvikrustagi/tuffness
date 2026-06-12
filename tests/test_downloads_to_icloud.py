@@ -8,9 +8,7 @@ from unittest import mock
 
 
 SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "downloads_to_icloud"
+    Path(__file__).resolve().parents[1]
     / "downloads_to_icloud.py"
 )
 
