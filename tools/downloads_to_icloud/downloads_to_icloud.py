@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import plistlib
 import shutil
 import sys
 import time
@@ -10,6 +11,7 @@ from pathlib import Path
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads"
 DEFAULT_ICLOUD_DIR = Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs" / "Downloads"
 DEFAULT_STATE_FILE = Path.home() / ".local" / "state" / "downloads-to-icloud" / "seen.json"
+DEFAULT_LABEL = "com.user.downloads-to-icloud"
 TEMP_SUFFIXES = (
     ".crdownload",
     ".download",
@@ -37,6 +39,18 @@ def load_seen(state_file):
 def save_seen(state_file, seen):
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(json.dumps(sorted(seen), indent=2), encoding="utf-8")
+
+
+def render_launch_agent_plist(script_path, stdout_log, stderr_log, label=DEFAULT_LABEL):
+    config = {
+        "Label": label,
+        "ProgramArguments": ["/usr/bin/python3", str(script_path)],
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        "StandardOutPath": str(stdout_log),
+        "StandardErrorPath": str(stderr_log),
+    }
+    return plistlib.dumps(config, sort_keys=False).decode("utf-8")
 
 
 def is_temporary_download(path):
@@ -144,11 +158,28 @@ def parse_args():
     parser.add_argument("--interval-seconds", type=float, default=5)
     parser.add_argument("--settle-seconds", type=float, default=2)
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--print-launch-agent", action="store_true")
+    parser.add_argument("--script-path", type=Path)
+    parser.add_argument("--stdout-log", type=Path)
+    parser.add_argument("--stderr-log", type=Path)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    if args.print_launch_agent:
+        if not args.script_path or not args.stdout_log or not args.stderr_log:
+            raise SystemExit("--print-launch-agent requires --script-path, --stdout-log, and --stderr-log")
+        print(
+            render_launch_agent_plist(
+                script_path=args.script_path,
+                stdout_log=args.stdout_log,
+                stderr_log=args.stderr_log,
+            ),
+            end="",
+        )
+        return
+
     if args.once:
         scan_once(args.downloads_dir, args.destination_dir, args.state_file, args.settle_seconds)
         return

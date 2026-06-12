@@ -114,8 +114,13 @@ construction/
 ├── apps/web/           # Next.js application
 ├── apps/processor/     # FastAPI PDF ingestion worker
 ├── supabase/migrations/
+├── tools/              # Local helper automations
 └── docs/
 ```
+
+## Local automations
+
+This repo includes a macOS helper that moves new completed files from `~/Downloads` to iCloud Drive in the background. See `tools/downloads_to_icloud/README.md` for install, uninstall, and troubleshooting steps.
 
 ## Submittal review flow (Phase 5)
 
