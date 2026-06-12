@@ -2,6 +2,18 @@ export type MemberRole = "owner" | "admin" | "member" | "viewer";
 export type ProjectStatus = "active" | "archived";
 export type DocumentType = "spec" | "drawing" | "submittal" | "other";
 export type DocumentStatus = "pending" | "processing" | "ready" | "failed";
+export type AccountStatus = "trial" | "active" | "paused" | "churned";
+export type AccountPlan = "starter" | "growth" | "enterprise" | "internal";
+export type CompanyType =
+  | "general_contractor"
+  | "subcontractor"
+  | "owner"
+  | "architect"
+  | "consultant"
+  | "other";
+export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
+export type OnboardingEventSource = "system" | "platform_admin" | "org_admin";
+export type AuditActorKind = "platform_admin" | "org_member" | "system";
 
 export interface Profile {
   id: string;
@@ -61,6 +73,69 @@ export interface Document {
 
 export interface OrganizationWithRole extends Organization {
   role: MemberRole;
+}
+
+export interface PlatformAdmin {
+  id: string;
+  user_id: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface OrganizationAccount {
+  organization_id: string;
+  status: AccountStatus;
+  plan: AccountPlan;
+  company_type: CompanyType;
+  website: string | null;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  billing_contact_email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationAccountNote {
+  id: string;
+  organization_id: string;
+  note: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface OrganizationInvite {
+  id: string;
+  organization_id: string;
+  email: string;
+  role: MemberRole;
+  status: InviteStatus;
+  invited_by: string | null;
+  accepted_by: string | null;
+  created_at: string;
+  accepted_at: string | null;
+  expires_at: string;
+}
+
+export interface AccountOnboardingEvent {
+  id: string;
+  organization_id: string;
+  event_type: string;
+  source: OnboardingEventSource;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  organization_id: string | null;
+  actor_user_id: string | null;
+  actor_kind: AuditActorKind;
+  event_type: string;
+  target_type: string;
+  target_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 export type IssueType =

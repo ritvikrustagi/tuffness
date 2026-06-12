@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
-export function AppHeader({ email }: { email: string }) {
+export function AppHeader({ email, showAdmin }: { email: string; showAdmin?: boolean }) {
   const router = useRouter();
 
   async function signOut() {
@@ -22,6 +22,11 @@ export function AppHeader({ email }: { email: string }) {
           AI Project Engineer
         </Link>
         <div className="flex items-center gap-3">
+          {showAdmin && (
+            <Link href="/admin/accounts" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-50">
+              Admin
+            </Link>
+          )}
           <span className="hidden text-sm text-zinc-500 sm:inline">{email}</span>
           <Button variant="ghost" onClick={signOut}>
             Sign out

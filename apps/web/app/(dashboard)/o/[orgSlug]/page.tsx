@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { canManageOrganization } from "@/lib/api/organizations";
 import type { Project } from "@/lib/types/database";
 
 export default async function OrgPage({
@@ -20,6 +21,19 @@ export default async function OrgPage({
     .maybeSingle();
 
   if (!organization) notFound();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: membership } = user
+    ? await supabase
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", organization.id)
+        .eq("user_id", user.id)
+        .maybeSingle()
+    : { data: null };
 
   const { data: projects } = await supabase
     .from("projects")
@@ -40,9 +54,16 @@ export default async function OrgPage({
           </h1>
           <p className="mt-1 text-sm text-zinc-500">Projects</p>
         </div>
-        <Link href={`/o/${orgSlug}/projects/new`}>
-          <Button>New project</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {canManageOrganization(membership?.role) && (
+            <Link href={`/o/${orgSlug}/settings`}>
+              <Button variant="secondary">Settings</Button>
+            </Link>
+          )}
+          <Link href={`/o/${orgSlug}/projects/new`}>
+            <Button>New project</Button>
+          </Link>
+        </div>
       </div>
 
       {(projects ?? []).length === 0 ? (

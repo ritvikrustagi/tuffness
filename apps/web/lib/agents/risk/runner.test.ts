@@ -274,13 +274,13 @@ describe("risk scan runner helpers", () => {
   });
 
   test("failRiskAgentRun writes default summary shape for plain scan errors", async () => {
-    let patch: Record<string, unknown> | null = null;
+    const patches: Record<string, unknown>[] = [];
     const supabase = {
       from: (table: string) => {
         expect(table).toBe("agent_runs");
         return {
-          update: (value: Record<string, unknown>) => {
-            patch = value;
+              update: (value: Record<string, unknown>) => {
+                patches.push(value);
             return {
               eq: async (column: string, value: string) => {
                 expect(column).toBe("id");
@@ -299,7 +299,8 @@ describe("risk scan runner helpers", () => {
       new RiskScanError("No processed documents available for this project.", "no_documents")
     );
 
-    expect(patch?.output_summary).toEqual({
+    expect(patches).toHaveLength(1);
+    expect(patches[0].output_summary).toEqual({
       mode: "risk_register_scan",
       risks_created: 0,
       rfis_created: 0,

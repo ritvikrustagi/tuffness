@@ -16,3 +16,24 @@ export function mapMemberships(
     return [{ ...org, role: row.role }];
   });
 }
+
+const roleRank: Record<MemberRole, number> = {
+  viewer: 1,
+  member: 2,
+  admin: 3,
+  owner: 4,
+};
+
+export const memberRoles = ["owner", "admin", "member", "viewer"] as const satisfies readonly MemberRole[];
+
+export function isMemberRole(value: unknown): value is MemberRole {
+  return typeof value === "string" && memberRoles.includes(value as MemberRole);
+}
+
+export function canManageOrganization(role: MemberRole | null | undefined) {
+  return role === "owner" || role === "admin";
+}
+
+export function isRoleAtLeast(role: MemberRole, minimum: MemberRole) {
+  return roleRank[role] >= roleRank[minimum];
+}
